@@ -137,25 +137,23 @@ type
 
 {-- display -----------------------}
 type
-  Point = ^PointObj;
-  Quad  = ^QuadObj;
 
-  PointObj = object
+  Point = object
     x, y : integer;
   end;
 
-  QuadObj = object( PointObj )
+  Quad = object( Point )
     w, h : integer;
     function x2 : integer;
     function y2 : integer;
   end;
 
-function QuadObj.x2 : integer;
+function Quad.x2 : integer;
   begin
     x2 := x + w
   end;
 
-function QuadObj.y2 : integer;
+function Quad.y2 : integer;
   begin
     y2 := y + h
   end;
