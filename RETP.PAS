@@ -57,6 +57,7 @@ type
 
   BaseObj = object(objects.TObject)
     function Str: string; virtual;
+    destructor Destroy; virtual;
   end;
 
   AtomObj = object(BaseObj)
@@ -89,6 +90,10 @@ var
 function BaseObj.Str : string;
   begin
     Str := '$';
+  end;
+
+destructor BaseObj.Destroy;
+  begin
   end;
 
 function IntObj.Str : string;
