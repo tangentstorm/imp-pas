@@ -533,8 +533,8 @@ procedure MachineObj.Update;
 procedure MachineObj.Render;
   var i,j : integer;
   begin
-    for i := 1 to 64 do
-      for j := 1 to 16 do
+    for i := 32 to 64 do
+      for j := 8 to 16 do
         colorxy( random(8), i, j, 'x' );
   end;
 
@@ -798,15 +798,6 @@ procedure Destroy;
 var rect : TRect;
 begin
   Create;
-  begin
-    HideMouse;
-    rect.Assign(1,1,20,20);
-    view.Init(rect); blinking(off);
-    colorxy( $e0, 0, 0, 'hello world');
-    colorxy( $60, 1, 1, 'hello world');
-    colorxy( $0E, 22, 10, #2);
-    ShowMouse;
-  end;
   repeat
     Update;
     Render;
