@@ -209,7 +209,7 @@ function Quad.y2 : integer;
 {-- tagged data types -------------}
 type
   Tagged  = ^TaggedObj;
-  Symbol  = ^TokenObj;    { for symbol/lookup tables }
+  Symbol  = ^SymbolObj;   { for symbol/lookup tables }
   Token   = ^TokenObj;    { for parsing long texts }
 
   TaggedObj = object(BaseObj)
@@ -230,7 +230,6 @@ type
   TypeDef  = ^TypeDefObj;
   FieldDef = ^FieldDefObj;
   Tuple    = ^TupleObj;    { generic record/struct }
-  Message  = ^MessageObj;  { for message passing }
 
   TypeKind = ( tkSimple, tkTkUnion, tkFunction, tkSchema );
 
@@ -251,12 +250,6 @@ type
     data : Buffer;
   end;
 
-  MessageObj = object(TaggedObj)
-    sym : Symbol;
-    args: Tuple;
-  end;
-
-
 {-- actors ------------------------}
 const
   cmd_quit  =  -1;
@@ -265,30 +258,31 @@ const
   cmd_hide  =  -4;
   cmd_show  =  -5;
   cmd_help  =  -6;
-  evt_keydn = -25;
-  evt_keyup = -26;
-  evt_mosdn = -27;
-  evt_mosup = -28;
-  evt_mosmv = -29;
+  kGroupMaxSlot = 15;
 
 type
   Actor = ^ActorObj;
   Group = ^GroupObj;
   Morph = ^MorphObj;
+  Message  = ^MessageObj;  { for message passing }
 
-  ActorObj = object
+  ActorObj = object(BaseObj)
     active,           { wants update() }
     alive,            { exists but not alive triggers gc }
     visible,          { to allow hide/show }
     exists : boolean; { turn off everything at once }
     constructor Create;
-    destructor  Destroy; virtual;
     procedure Update; virtual;
     procedure Render; virtual;
-    function Handle( msg : Token ):boolean; virtual;
+    function Handle( msg : Message ):boolean; virtual;
   end;
 
   GroupObj = object( ActorObj )
+    members : array[ 0 .. kGroupMaxSlot ] of Actor;
+    count   : byte;
+    constructor Create;
+    procedure Add( a : Actor );
+    function Handle( msg : Message ):boolean; virtual;
   end;
 
   MorphObj = object( GroupObj )
@@ -298,16 +292,19 @@ type
     procedure Draw; virtual;
   end;
 
+  MessageObj = object(TaggedObj)
+    sym : Symbol;
+    sender: Actor;
+    args: Tuple;
+  end;
+  
+
 constructor ActorObj.Create;
   begin
     alive  := true;
     active := true;
     exists := true;
     visible := false;
-  end;
-
-destructor ActorObj.Destroy;
-  begin
   end;
 
 procedure ActorObj.Render;
@@ -318,21 +315,41 @@ procedure ActorObj.Update;
   begin
   end;
 
-function ActorObj.Handle( msg : Token ):boolean;
+function ActorObj.Handle( msg : Message ):boolean;
   begin
+    Handle := true;
     case msg^.tag of
-      cmd_quit:
-        begin
-          active := false;
-          Handle := true;
-        end;
-      cmd_draw:
-        Render;
-      cmd_step:
-        Update;
-      else
-        Handle := false { didn't handle, so let the next guy try }
+      cmd_quit: active := false;
+      cmd_draw: Render;
+      cmd_step: Update;
+      else handle := false
     end
+  end;
+
+constructor GroupObj.Create;
+  begin
+    self.count := 0;
+  end;
+
+procedure GroupObj.Add( a : Actor );
+  begin
+    if self.count < kGroupMaxSlot then
+      begin
+        self.members[count] := a;
+        inc(self.count);
+      end
+  end;
+
+function GroupObj.Handle( msg: Message ):boolean;
+  var handled : boolean; i : byte;
+  begin
+    handled := false;
+    while not handled and (i < self.count) do
+      begin
+        inc(i);
+        handled := self.members[i]^.handle(msg)
+      end;
+    handle := handled
   end;
 
 constructor MorphObj.Create;
@@ -736,17 +753,23 @@ procedure Create;
   begin
     InitEvents; HideMouse;
     numActors := 0; numTokens := 0;
-    Register(New(Machine, Create));
+    focus := New(Shell, Create);
+    Register(focus);
     InitVideo; ClearScreen;
     drawto := @screen;
     ShowMouse;
   end;
 
-procedure Update;
-  var i : byte; e : TEvent; a : Actor;
+function NextKeyEvent( var e : TEvent ):boolean;
   begin
     GetKeyEvent(e);
-    if (e.what = evKeyDown) then
+    NextKeyEvent := e.what <> evNothing;
+  end;
+
+procedure Update;
+  var i : byte; e : TEvent; a : Actor; msg:Event;
+  begin
+    if NextKeyEvent(e) then
       case e.KeyCode of
         kbEsc  : halt;
       else
@@ -754,7 +777,10 @@ procedure Update;
           '0'  : blinking(on);
           '1'  : blinking(off);
         else
-          write(chr(e.KeyCode))
+          msg := New(Event, Create(evt_keydn, e));
+          if not focus^.handle(msg) then
+            pass; {-- todo global keymap --}
+          Dispose(msg, Destroy)
         end
       end;
 
