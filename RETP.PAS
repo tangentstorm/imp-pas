@@ -1,5 +1,5 @@
 program RETROP;
-uses crt, objects, drivers, views;
+uses crt, dos, objects, drivers, views;
 
 {-- misc -------------------------}
 const
@@ -7,7 +7,57 @@ const
   off = false;
 type
   set32 = set of 0..31;
+  thunk = procedure;
 
+procedure pass;
+  begin
+  end;
+
+procedure discard(var value);
+  begin
+  end;
+
+function assigned(p : pointer):boolean;
+  begin
+    assigned := p <> nil
+  end;
+
+
+{-- string routines ------}
+
+procedure SetLength(var s:string; len:byte);
+  begin
+    s[0] := chr(len);
+  end;
+
+function ChNTimes( ch: char; n: byte ):string;
+  var result:string; i : byte;
+  begin
+    SetLength( result, n );
+    for i := 1 to n do result[ i ] := ch;
+    ChNTimes := result;
+  end;
+
+function n2s( i : longint ) : string;
+  var result : string[11];
+  begin
+    Str( i, result );
+    n2s := result;
+  end;
+
+function flushrt( s:string; size:byte; ch:char ) : string;
+  var gap : shortint; result : string;
+  begin
+    gap := size - length(s);
+    if gap > 0
+      then flushrt := chntimes(ch, gap) + s
+      else flushrt := s
+  end;
+
+function boolchar( cond : boolean; ch0, ch1 : char ): char;
+  begin
+    if cond then boolchar := ch0 else boolchar := ch1
+  end;
 
 {-- screen IO --------------------}
 const
@@ -97,10 +147,8 @@ destructor BaseObj.Destroy;
   end;
 
 function IntObj.Str : string;
-  var result : string[11];
   begin
-    system.Str(value, result);
-    Str := result
+    Str := n2s( value );
   end;
 
 function StrObj.Str : string;
@@ -290,12 +338,49 @@ function ActorObj.Handle( msg : Token ):boolean;
 constructor MorphObj.Create;
   begin
     ActorObj.Create;
+    bounds.x := 0;
+    bounds.y := 0;
+    bounds.w := 1;
+    bounds.h := 1;
     visible := true;
   end;
 
 procedure MorphObj.Draw;
   begin
     WriteLn('morph')
+  end;
+
+{-- ClockMorph -------------}
+type
+  ClockMorph = ^ClockObj;
+  ClockObj = object( MorphObj )
+    color : byte;
+    constructor Create;
+    procedure Render; virtual; { override }
+    function Str:string; virtual; { override }
+  end;
+
+constructor ClockObj.Create;
+  begin
+    { inherited } MorphObj.Create;
+    color := $03; { cyan on blue }
+  end;
+
+function ClockObj.Str: string;  { 1218.93 12:40:00 }
+  var h, h2, mi, s, n: word;
+  begin
+    dos.gettime( h, mi, s, n );
+    h2 := h mod 12;
+    if h2 = 0 then h2 := 12;
+    Str := flushrt( n2s( h2 ), 2, '0' ) + ':' +
+           flushrt( n2s( mi ), 2, '0' ) + ':' +
+           flushrt( n2s( s ),  2, '0' ) +
+           boolchar( h < 12, 'a', 'p');
+  end;
+
+procedure ClockObj.Render;
+  begin
+    colorxy( color, bounds.x, bounds.y, self.str )
   end;
 
 {-- stack -------------------}
@@ -473,6 +558,179 @@ procedure Register(this:Actor);
         Writeln('out of actor slots');
       end
   end;
+
+
+
+{-- event system ---------}
+const
+  evt_keydn = -25;
+  evt_keyup = -26;
+  evt_mosdn = -27;
+  evt_mosup = -28;
+  evt_mosmv = -29;
+
+type
+  Event = ^EventObj;
+  EventObj = object(MessageObj)
+    data : TEvent;
+    constructor Create(etag: longint; e:TEvent);
+  end;
+
+constructor EventObj.Create(etag:longint; e:TEvent);
+  begin
+    tag  := etag;
+    data := e;
+  end;
+
+{-- simple dictionary lookup ----}
+
+type
+  Dict  = ^DictObj;
+  Entry = ^EntryObj;
+
+  DictObj = object(BaseObj)
+    nextdict : Dict;
+    latest   : Entry;
+    constructor Create;
+    procedure Define( name : string; value : obj );
+    function Lookup( s : string; var item : Obj ): boolean;
+  end;
+
+  EntryObj = object
+    prev : Entry;
+    name : string[32];
+    item : obj;
+  end;
+
+constructor DictObj.Create;
+  begin
+    nextdict := nil;
+    latest := nil;
+  end;
+
+procedure DictObj.Define( name: string; value : Obj );
+  var en : Entry;
+  begin
+    en := New(Entry);
+    en^.prev := latest;
+    en^.name := name;
+    en^.item := value;
+    latest := en;
+  end;
+
+function DictObj.Lookup( s : string; var item : Obj): boolean;
+  var en : Entry; found : boolean;
+  begin
+    en := latest;
+    found := false;
+    while Assigned(en) and not found do
+      if en^.name = s then
+        begin
+          item  := en^.item;
+          found := true;
+        end
+      else
+        begin
+        end;
+    lookup := found;
+  end;
+
+{-- interpreter widget ---}
+
+type
+  Shell = ^ShellObj;
+  ShellObj = object( MorphObj )
+    curpos : byte;
+    cmdstr : string;
+    vm     : Machine;
+    clock  : ClockMorph;
+    words  : Dict;
+    constructor Create;
+    procedure Invoke( cmd : string );
+    procedure Clear;
+    function Handle( msg : Message ):boolean; virtual; { override }
+    procedure Render; virtual;   { override }
+    destructor Destroy; virtual; { override }
+  end;
+
+constructor ShellObj.Create;
+  begin
+    {inherited} MorphObj.Create;
+    vm := New(Machine, Create); register(vm);
+    clock := New(ClockMorph, Create);
+    clock^.bounds.x := 3; clock^.bounds.y := 3;
+    Register(clock);
+    self.Clear;
+    words := New(Dict, Create);
+  end;
+
+procedure ShellObj.invoke( cmd : string );
+  var o : obj;
+  begin
+
+    if words^.Lookup(cmd, o) then
+      begin
+        TextColor(green);
+        writeln( o^.Str );
+      end
+    else
+      begin
+        gotoxy(0, hi(windmax)); writeln; { to scroll }
+        gotoxy(0, hi(windmax)-2);
+        TextColor(red); write('unknown command: ');
+        TextColor(yellow); write(cmd); clreol; writeln;
+      end;
+    gotoxy(1,1); clreol; { clear the random junk after the scroll }
+  end;
+
+procedure ShellObj.Clear;
+  begin
+    cmdstr := '';
+    curpos := 1;
+  end;
+
+function ShellObj.Handle( msg : Message ) : boolean;
+  var ch : char;
+  begin
+    if msg^.tag = evt_keydn then with Event(msg)^ do
+      begin
+        handle := true;
+        ch := chr(data.keyCode);
+        case ch of
+          ^H : if length(cmdstr) > 0 then
+                  SetLength(cmdstr, length(cmdstr)-1)
+               else pass;
+          ^M : begin
+                 self.Invoke(cmdstr); self.Clear
+               end;
+        else
+          cmdstr := cmdstr + ch;
+          inc(curpos)
+        end
+      end
+    else handle := false;
+  end;
+
+procedure ShellObj.Render;
+  begin
+    colorxy($1e, 0, kScrH-1, '> ');
+    colorxy($1f, 2, kScrH-1, cmdstr);
+    colorxy($1f, 2 + length(cmdstr), kScrH-1,
+      chntimes(' ', kScrW - 2 - length(cmdstr)));
+    gotoxy( 2 + curpos, kScrH-1 );
+  end;
+
+destructor ShellObj.destroy;
+  begin
+    dispose(self.words, Destroy);
+    vm^.alive := false;
+    clock^.alive := false;
+    {inherited} ActorObj.Destroy;
+  end;
+
+{-- main program ---------}
+var
+  focus : Morph;
 
 procedure Create;
   begin
