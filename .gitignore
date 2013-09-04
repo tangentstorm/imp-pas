@@ -1,0 +1,17 @@
+.gen/
+bin/
+*~
+*.a
+*.o
+*.ppu
+*.pyc
+*.gpi
+*.bak
+
+
+fp___.err
+fp___.out
+fp.cfg
+fp.ini
+fp.dsk
+*.lps
