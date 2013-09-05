@@ -3,6 +3,46 @@
 #
 ##################################################
 
+#-- helper routines for implementing the system --
+
+# (zip '(a b c) (1 2 3))
+# -> ((a . 1) (b . 2) (c . 3))
+(de zip (A B)
+   (if (and A B)
+      (cons (cons (car A) (car B))
+         (zip (cdr A) (cdr B)) ) ) )
+
+# same thing, but produce new lists instead of pairs:
+# : (zipl '(a b c) (1 2 3))
+# -> ((a 1) (b 2) (c 3))
+(de zipl (A B)
+   (zip A (mapcar list B)) )
+
+# quoted zip. the first argument is quoted, the second evaluated
+# : (zipq (a b c) (list 1 2 3))
+# -> ((a . 1) (b . 2) (c . 3))
+(de zipq AB
+   (zip (car AB) (eval (cadr AB))))
+
+# Now we can create quoted definitions.
+# (defq) defines a function like (de), except arguments to
+# the function are not evaluated.
+(de defq ARGS
+   (let (Name (car ARGS)
+         Args (cadr ARGS)
+         Body (cddr ARGS))
+      (eval
+         (list 'de Name 'ARGZ
+            (cons 'bind
+               (cons (list 'zipq Args 'ARGZ)
+                  Body ) ) ) ) ) )
+
+# For example:
+# : (enlist (a b c (+ 1 2)))
+# -> ((a) (b) (c) ((+ 1 2)))
+(defq enlist (XS)
+   (mapcar list XS) )
+
 #-- control flow ---------------------------------
 
 (setq TRUE 'TRUE)
@@ -35,7 +75,6 @@
       (eval Block)
         (while (not (eval Cond))
            (eval Block) ) ) )
-
 
 #-- std library ----------------------------------
 
