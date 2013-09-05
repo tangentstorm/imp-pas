@@ -28,10 +28,15 @@
 # (qd) defines a function like (de), except arguments to
 # the function are not evaluated.
 (de qd ARGS
-   (bind (zipq (Name Args Body) ARGS)
+   # can't use bind+zipq here unless i want to use (prog) in
+   # all the definition bodies. and i don't! :)
+   (let (Name (car ARGS)
+         Args (cadr ARGS)
+         Body (cddr ARGS) )
       (eval
          (list 'de Name 'ARGZ
-            (list 'bind (list 'zipq Args 'ARGZ)
+            (append
+               (list 'bind (list 'zipq Args 'ARGZ))
                Body ) ) ) ) )
 
 # For example:
@@ -53,25 +58,18 @@
 (setq ELSE prog)
 (setq UNTIL prog)
 
-(de PROGRAM ARGS
-   (let (Name (car ARGS)
-         Body (cadr ARGS))
-      (set Name (list '() Body))))
+(qd PROGRAM (Name Body)
+   (set Name (list '() Body)) )
 
-(de IF ARGS
-   (let (Cond (car ARGS)
-         ThenBlock (cadr ARGS)
-         ElseBlock (caddr ARGS) )
-      (if (eval Cond)
-         (eval ThenBlock)
-         (eval ElseBlock) ) ) )
+(qd IF (Cond ThenBlock ElseBlock)
+   (if (eval Cond)
+      (eval ThenBlock)
+      (eval ElseBlock) ) )
 
-(de REPEAT ARGS
-   (let (Block (car ARGS)
-         Cond  (cadr ARGS) )
-      (eval Block)
-        (while (not (eval Cond))
-           (eval Block) ) ) )
+(qd REPEAT (Block Cond)
+   (eval Block)
+   (while (not (eval Cond))
+      (eval Block) ) )
 
 #-- std library ----------------------------------
 
