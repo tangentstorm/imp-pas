@@ -25,22 +25,19 @@
    (zip (car AB) (eval (cadr AB))))
 
 # Now we can create quoted definitions.
-# (defq) defines a function like (de), except arguments to
+# (qd) defines a function like (de), except arguments to
 # the function are not evaluated.
-(de defq ARGS
-   (let (Name (car ARGS)
-         Args (cadr ARGS)
-         Body (cddr ARGS))
+(de qd ARGS
+   (bind (zipq (Name Args Body) ARGS)
       (eval
          (list 'de Name 'ARGZ
-            (cons 'bind
-               (cons (list 'zipq Args 'ARGZ)
-                  Body ) ) ) ) ) )
+            (list 'bind (list 'zipq Args 'ARGZ)
+               Body ) ) ) ) )
 
 # For example:
 # : (enlist (a b c (+ 1 2)))
 # -> ((a) (b) (c) ((+ 1 2)))
-(defq enlist (XS)
+(qd enlist (XS)
    (mapcar list XS) )
 
 #-- control flow ---------------------------------
