@@ -1,16 +1,14 @@
 #
-# a implish interpreter in picolisp
+# an interpreter for implish in picolisp
 #
 ##################################################
 
 #-- helper routines for implementing the system --
 
-# (zip '(a b c) (1 2 3))
+# : (zip '(a b c) (1 2 3 4 5))
 # -> ((a . 1) (b . 2) (c . 3))
 (de zip (A B)
-   (if (and A B)
-      (cons (cons (car A) (car B))
-         (zip (cdr A) (cdr B)) ) ) )
+   (mapcar cons A B))
 
 # same thing, but produce new lists instead of pairs:
 # : (zipl '(a b c) (1 2 3))
@@ -33,8 +31,8 @@
    (let (Name (car ARGS)
          Args (cadr ARGS)
          Body (cddr ARGS) )
-      (eval
-         (list 'de Name 'ARGZ
+      (def Name
+         (list 'ARGZ
             (append
                (list 'bind (list 'zipq Args 'ARGZ))
                Body ) ) ) ) )
