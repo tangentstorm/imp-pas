@@ -1,12 +1,13 @@
 { imprex : implish parser expressions  }
 {$mode objfpc}{$h+}
+{$modeswitch advancedrecords+} // for generic-friendly record operators
 unit imprex;
 interface uses arrays;
 
 type
   TCharGen = function : char;
   TCharSet = set of char;
-  TRuleID	   = cardinal;
+  TRuleID  = cardinal;
 
 //-- primitive rule constructors -------------------------------
 
@@ -157,10 +158,10 @@ implementation
 // custom actions later (even at runtime). For the predefined
 // types, however, can cast the cardinal to a TCode:
 type
-  TCode	= (kNul, kEoi, kAny, kLit, kAlt, kSeq, kRep,
-	   kNeg, kOpt, kOrp, kDef, kSub, kAct, kTok,
-	   kSkip, kNode, kHide, kLift, kVirt,
-	   kCustom);
+  TCode = (kNul, kEoi, kAny, kLit, kAlt, kSeq, kRep,
+           kNeg, kOpt, kOrp, kDef, kSub, kAct, kTok,
+           kSkip, kNode, kHide, kLift, kVirt,
+           kCustom);
 
 // Rules are stored as pairs of cardinals. The first number
 // represents the rule code (either the ord() of one of the
@@ -168,24 +169,23 @@ type
 // contains a constant or the key of a value in another table.
 type
   TRuleData = record
-		code, data : cardinal
-	      end;
+                code, data : cardinal;
+                class operator = (a,b : TRuleData) : boolean;
+              end;
+
 function RuleData(code, data : cardinal) : TRuleData;
   begin
     result.code := code;
     result.data := data;
   end;
 
-operator = (a : TRuleData; b : TRuleData) : boolean;
+class operator TRuleData.= (a : TRuleData; b : TRuleData) : boolean;
   begin
     result := (a.code = b.code) and (a.data = b.data)
   end;
-
-// sadly, despite doing the above, trying to use GEqArray below
-// results in an error:
-// Error: Operator is not overloaded: "TRuleData" = "TRuleData"
+  
 var
-  rultbl : specialize GArray<TRuleData>;
+  rultbl : specialize GEqArray<TRuleData>;
 
 // The 'strtbl' and 'settbl' arrays are simple lookup tables
 // for strings and character sets, respectively.
