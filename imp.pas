@@ -2,7 +2,7 @@
 
 {$mode objfpc}
 program imp;
-uses implish;
+uses implish, imprex;
 begin
   implish.repl
 end.
