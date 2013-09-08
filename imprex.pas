@@ -1,6 +1,6 @@
-{ imprexv : implish parser expression virtual machine }
+{ imprex : implish parser expressions  }
 {$mode delphi}
-unit imprexv;
+unit imprex;
 interface
 
 type
@@ -49,7 +49,7 @@ function rep( rules : array of const ) : TRule;
 // neg : negate a match rule.
 // This implements a logical 'not' operator: if the underlying
 // pattern succeeds, then this rule will fail, and vice versa.
-function rep( rules : array of const ) : TRule;
+function neg( rules : array of const ) : TRule;
 
 // opt : optionally match a rule. Always succeeds.
 // This works like the '?' character in a regular expression.
@@ -143,6 +143,82 @@ function lift(rules : array of const) : TRule;
 function virt( name : string ) : TRule;
 
 implementation
+
+function nul;
+  begin
+  end;
+
+function eoi : TRule;
+  begin
+  end;
+
+function any( s : TCharSet ) : TRule;
+  begin
+  end;
+
+function lit( s : string ) : TRule;
+  begin
+  end;
+
+function alt( rules : array of const ) : TRule;
+  begin
+  end;
+
+function seq( rules : array of const ) : TRule;
+  begin
+  end;
+
+function rep( rules : array of const ) : TRule;
+  begin
+  end;
+
+function neg( rules : array of const ) : TRule;
+  begin
+  end;
+
+function opt( rules : array of const ) : TRule;
+  begin
+  end;
+
+function orp( rules : array of const ) : TRule;
+  begin
+  end;
+
+function def( name : string; rules : array of const ) : TRule;
+  begin
+  end;
+
+function sub( name : string ) : TRule;
+  begin
+  end;
+
+function act( action : cardinal; rules : array of const ) : TRule;
+  begin
+  end;
+
+function tok( name : string; rules : array of const ) : TRule;
+  begin
+  end;
+
+function skip( name : string; rules : array of const ) : TRule;
+  begin
+  end;
+
+function node( name : string; rules : array of const ) : TRule;
+  begin
+  end;
+
+function hide(rules : array of const) : TRule;
+  begin
+  end;
+
+function lift(rules : array of const) : TRule;
+  begin
+  end;
+
+function virt( name : string ) : TRule;
+  begin
+  end;
 
 begin
 end.
