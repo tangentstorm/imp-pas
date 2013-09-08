@@ -1,7 +1,7 @@
 { imprex : implish parser expressions  }
 {$mode delphi}
 unit imprex;
-interface
+interface uses arrays;
 
 type
   TCharGen = function : char;
@@ -142,7 +142,57 @@ function lift(rules : array of const) : TRuleID;
 // virt : emit a virtual token of length 0. Always succeeds.
 function virt( name : string ) : TRuleID;
 
+//////////////////////////////////////////////////////////////
 implementation
+//////////////////////////////////////////////////////////////
+
+//-- rule database -------------------------------------
+
+// The rules are stored in a simple in-memory semi-relational
+// database. The tables are just dynamic arrays, and the
+// primary key for a record is simply its index within the array.
+
+// Rule codes (corresponding to the public constructors) are
+// stored as cardinals in the database to allow creating
+// custom actions later (even at runtime). For the predefined
+// types, however, can cast the cardinal to a TCode:
+type
+  TCode	= (kNul, kEoi, kAny, kLit, kAlt, kSeq, kRep,
+	   kNeg, kOpt, kOrp, kDef, kSub, kAct, kTok,
+	   kSkip, kNode, kHide, kLift, kVirt,
+	   kCustom);
+
+// Rules themselves are variable length records. They consist
+// of a cardinal representing the TCode, plus any data specific
+// to that type. For example, 'alt' and 'seq' each require a
+// length for tracking the number of sub-rules, whereas 'lit'
+// and 'any' records reference the lookup tables. All of these
+// things are just cardinals, though, so 'rultbl' is just a big
+// array of cardinal pairs.
+type
+  TRuleData = record
+		code, data : cardinal
+	      end;
+var
+  rultbl : GArray<TRuleData>;
+
+// The 'strtbl' and 'chstbl' arrays are simple lookup tables
+// for strings and character sets, respectively.
+  strtbl : GArray<string>;
+  chstbl : GArray<TCharSet>;
+
+// 'deftbl' maps rule names (strings) to definitions in 'rultbl'.
+// When a named rule is referenced before it is defined, the 'rule'
+// field will be zero.
+type
+  TRuleName = record
+		name : string;
+		rule : TRuleID;
+	      end;
+var
+  deftbl : GArray<TRuleName>;
+
+//-- constructors -------------------------------------
 
 function nul;
   begin
