@@ -142,11 +142,11 @@ function lift(rules : array of const) : TRuleID;
 // virt : emit a virtual token of length 0. Always succeeds.
 function virt( name : string ) : TRuleID;
 
-//////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
 implementation
-//////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
 
-//-- rule database -------------------------------------
+//-- rule database ---------------------------------------------
 
 // The rules are stored in a simple in-memory semi-relational
 // database. The tables are just dynamic arrays, and the
@@ -211,7 +211,7 @@ type
 var
   deftbl : specialize GArray<TRuleName>;
 
-//-- constructors -------------------------------------
+//-- constructors ----------------------------------------------
 
 function nul : TRuleID;
   begin
