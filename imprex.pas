@@ -1,5 +1,5 @@
 { imprex : implish parser expressions  }
-{$mode delphi}
+{$mode objfpc}{$h+}
 unit imprex;
 interface uses arrays;
 
@@ -162,24 +162,43 @@ type
 	   kSkip, kNode, kHide, kLift, kVirt,
 	   kCustom);
 
-// Rules themselves are variable length records. They consist
-// of a cardinal representing the TCode, plus any data specific
-// to that type. For example, 'alt' and 'seq' each require a
-// length for tracking the number of sub-rules, whereas 'lit'
-// and 'any' records reference the lookup tables. All of these
-// things are just cardinals, though, so 'rultbl' is just a big
-// array of cardinal pairs.
+// Rules are stored as pairs of cardinals. The first number
+// represents the rule code (either the ord() of one of the
+// above values, or a custom code). The second number either
+// contains a constant or the key of a value in another table.
 type
   TRuleData = record
 		code, data : cardinal
 	      end;
-var
-  rultbl : GArray<TRuleData>;
+function RuleData(code, data : cardinal) : TRuleData;
+  begin
+    result.code := code;
+    result.data := data;
+  end;
 
-// The 'strtbl' and 'chstbl' arrays are simple lookup tables
+operator = (a : TRuleData; b : TRuleData) : boolean;
+  begin
+    result := (a.code = b.code) and (a.data = b.data)
+  end;
+
+// sadly, despite doing the above, trying to use GEqArray below
+// results in an error:
+// Error: Operator is not overloaded: "TRuleData" = "TRuleData"
+var
+  rultbl : specialize GArray<TRuleData>;
+
+// The 'strtbl' and 'settbl' arrays are simple lookup tables
 // for strings and character sets, respectively.
-  strtbl : GArray<string>;
-  chstbl : GArray<TCharSet>;
+  strtbl : specialize GEqArray<string>;
+  settbl : specialize GEqArray<TCharSet>;
+
+// 'argtbl' stores arguments. generally these are the arrays for
+// alt and the various sequence operators, but really it can be
+// any kind of data.
+type
+  TRuleArgs = array of cardinal;
+var
+  argtbl : specialize GEqArray<TRuleArgs>;
 
 // 'deftbl' maps rule names (strings) to definitions in 'rultbl'.
 // When a named rule is referenced before it is defined, the 'rule'
@@ -190,84 +209,126 @@ type
 		rule : TRuleID;
 	      end;
 var
-  deftbl : GArray<TRuleName>;
+  deftbl : specialize GArray<TRuleName>;
 
 //-- constructors -------------------------------------
 
-function nul;
+function nul : TRuleID;
   begin
+    result := 0  { there's only one nul rule }
   end;
 
 function eoi : TRuleID;
   begin
+    result := 1  { there's only one end of input rule }
   end;
 
 function any( s : TCharSet ) : TRuleID;
+  var id : cardinal;
   begin
+    if not settbl.Find( s, id ) then id := settbl.Append( s );
+    result := rultbl.Append( RuleData( ord( kAny ), id ));
   end;
 
 function lit( s : string ) : TRuleID;
+  var id : cardinal;
   begin
+    if not strtbl.Find( s, id ) then id := strtbl.Append( s );
+    result := rultbl.Append( RuleData( ord( kLit ), id ));
+  end;
+
+function compile( code : TCode; rules : array of const ) : TRuleID;
+  var i : cardinal; args : TRuleArgs;
+  begin
+    SetLength( args, Length( rules ));
+    for i := 0 to high( rules ) do begin
+      case rules[i].vtype of
+	vtString     : args[i] := lit(rules[i].vstring^);
+	vtAnsiString : args[i] := lit(AnsiString(rules[i].vAnsiString));
+      end
+    end;
+    i := argtbl.Append( args );
+    result := rultbl.Append( RuleData( ord( code ), i ));
   end;
 
 function alt( rules : array of const ) : TRuleID;
   begin
+    result := compile(kAlt, rules)
   end;
 
 function seq( rules : array of const ) : TRuleID;
   begin
+    result := compile(kSeq, rules)
   end;
 
 function rep( rules : array of const ) : TRuleID;
   begin
+    result := compile(kRep, rules)
   end;
 
 function neg( rules : array of const ) : TRuleID;
   begin
+    result := compile(kNeg, rules)
   end;
 
 function opt( rules : array of const ) : TRuleID;
   begin
+    result := compile(kOpt, rules)
   end;
 
 function orp( rules : array of const ) : TRuleID;
   begin
+    result := compile(kOrp, rules)
   end;
 
 function def( name : string; rules : array of const ) : TRuleID;
   begin
+    // TODO: record the name
+    result := compile(kDef, rules)
   end;
 
 function sub( name : string ) : TRuleID;
   begin
+    // TODO: retrieve the rule by name
   end;
 
 function act( action : cardinal; rules : array of const ) : TRuleID;
   begin
+    // TODO: record the action
+    result := compile(kAct, rules)
   end;
 
 function tok( name : string; rules : array of const ) : TRuleID;
   begin
+    // TODO: record the name
+    result := compile(kTok, rules)
   end;
 
 function skip( name : string; rules : array of const ) : TRuleID;
   begin
+    // TODO: record the name
+    result := compile(kSkip, rules)
   end;
 
 function node( name : string; rules : array of const ) : TRuleID;
   begin
+    // TODO: record the name
+    result := compile(kNode, rules)
   end;
 
 function hide(rules : array of const) : TRuleID;
   begin
+    result := compile(kHide, rules)
   end;
 
 function lift(rules : array of const) : TRuleID;
   begin
+    result := compile(kLift, rules)
   end;
 
 function virt( name : string ) : TRuleID;
   begin
+    // TODO: record the virtual token
   end;
 
 begin
