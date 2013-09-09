@@ -1,16 +1,16 @@
-{$mode objfpc}{$H+}
+{$mode objfpc}{$i xpc.inc}
 program minlisp(input, output);
-uses arrays, ascii, sysutils;
+uses xpc, arrays, ascii, sysutils, num;
 
 type
   TKind	= (kNUL, kERR, kINT, kSYM, kSTR, kCEL);
   TItem	= record
 	    kind : TKind;
 	    data : integer;
-	  end;	 
+	  end;
   TCell	= record
 	    car, cdr : TItem
-	  end;	     
+	  end;
   TBind	= record // variable binding
 	    symid : cardinal;
 	    attrs : TItem;
@@ -21,11 +21,6 @@ type
   TCelTbl = specialize GArray<TCell>;
   TFunc	= function( cell : TCell ) : TCell;
 
-function NextChar(out ch : char) : char;
-  begin
-    Read( ch ); result := ch;
-  end;
-
 var
   ch   : char = #0;
   nest : string = '';
@@ -35,9 +30,75 @@ var
   null : TItem;
 
 const
-  whitespace  = [#0..' '] - [^C, ^D];
+  whitespace  = [#0..' '];
   stopchars   = whitespace + ['(',')','[',']','{','}', '"', ''''];
   commentChar = '#';
+  prompt0     = 'imp> ';
+  prompt1     = '...> ';
+
+var
+  line	 : string;
+  lx, ly : cardinal;
+  done	 : boolean = false;
+
+function k2s( kind :  TKind ) : string;
+  begin
+    case kind of
+      kNUL : result := 'NUL';
+      kCEL : result := 'CEL';
+      kERR : result := 'ERR';
+      kINT : result := 'INT';
+      kSTR : result := 'STR';
+    end
+  end;
+
+var debugging : boolean = true;
+procedure debug( msg : string ); inline;
+  begin
+    if debugging then writeln( msg )
+  end;
+
+procedure error( const err: string );
+  begin
+    write( 'error at line ', ly, ', column ', lx, ': ' );
+    writeln( err );
+    halt;
+  end; { error }
+
+function Depth : cardinal;
+  begin
+    result := Length(nest);
+  end;
+
+function NextChar( var ch : char ) : char;
+  procedure prompt;
+    begin
+      { write the prompt first, because eof() blocks. }
+      if length(nest) > 0
+	then write( nest, prompt1 )
+        else write( prompt0 );
+      if eof then begin
+	ch := ascii.EOT;
+	line := ch;
+	done := true;
+	if depth > 0 then error( 'unexpected end of file' );
+	writeln;
+	halt; { todo : remove this once depth-checking works correctly }
+      end else begin
+	readln( line );
+	line := line + ascii.LF; { so we can do proper lookahead. }
+	inc( ly );
+	lx := 0;
+      end
+    end;
+  begin
+    while lx + 1 > length( line ) do prompt;
+    inc( lx );
+    ch := line[ lx ];
+    // debug( '[ line ' + n2s( ly ) +
+    //        ', column ' + n2s( lx ) + ' : ' +  ch + ']' );
+    result := ch;
+  end; { NextChar( ch ) }
 
 function Item( kind : TKind; data : cardinal ) : TItem;
   begin
@@ -64,10 +125,11 @@ function IsNum( s : string; out num : integer ) : boolean;
   begin
     result := true; num := 0;
     if s[1] = '-' then begin inc(i); negate := true; end;
-    while result and (i <= length(s)) do
-      if s[i] in ['0'..'9'] then
-	num := num * 10 + ord(s[i]) - ord('0')
+    while result and (i <= length(s)) do begin
+      if s[i] in ['0'..'9'] then num := num * 10 + ord(s[i]) - ord('0')
       else result := false;
+      Inc(i);
+    end;
     if result and negate then num := -num;
   end;
 
@@ -75,7 +137,7 @@ function ReadAtom : TItem;
   var tok : string = ''; i : integer;
   begin
     repeat tok := tok + ch until NextChar(ch) in stopchars;
-    if IsNum( tok, i ) 
+    if IsNum( tok, i )
       then result := Item( kINT, i )
       else result := Item( kSYM, Sym( tok ))
   end;
@@ -84,7 +146,7 @@ function PopChar( var s : string ) : char;
   var last : integer; ch : char;
   begin
     last := Length(s);
-    if last < 0 then ch := #0 else ch := s[ last ];
+    if last = 0 then ch := #0 else ch := s[ last ];
     SetLength( s, last - 1 );
     result := ch;
   end;
@@ -92,7 +154,7 @@ function PopChar( var s : string ) : char;
 function ReadString : TItem;
   var s : string = '';
   begin
-    nest += '"';
+    AppendStr(nest, '"');
     while NextChar(ch) <> '"' do
       if ch = '\' then
 	case NextChar(ch) of
@@ -102,7 +164,7 @@ function ReadString : TItem;
 	  else s := s + ch;
 	end
       else s := s + ch;
-    PopChar(nest);
+    PopChar(nest); NextChar(ch);
     result := Item(kSTR, Sym(s))
   end;
 
@@ -110,7 +172,7 @@ procedure SkipCommentsAndWhitespace;
   begin
     while ch in whitespace do
       if NextChar(ch) = commentChar then
-	repeat until NextChar(ch) = ascii.lf
+	repeat until NextChar(ch) = ascii.LF
   end;
 
 function ReadListEnd : TItem;
@@ -130,33 +192,39 @@ function ReadListEnd : TItem;
 			 + expect + ', got: ' + ch));
     end;
     NextChar(ch);
-  end;
+  end; { ReadListEnd }
 
+function ShowItem(item :TItem) : string; Forward;
 function ReadNext( out value : TItem ): TItem;
-  
-  function ReadList( out list : TItem ) : TItem;
-    var head, tail : TItem;
+
+  function ReadList( out res : TItem; AtHead : boolean) : TItem;
+    var car, cdr : TItem;
     begin
-      nest := nest + ch;
+      if AtHead then begin nest += ch; NextChar(ch) end;
       SkipCommentsAndWhitespace;
-      if ch in [')', ']', '}'] then result := ReadListEnd
-      else if ReadNext(head).kind = kERR then result := head
-      else if ReadList(tail).kind = kERR then result := tail
-      else result := Cons(head, tail);
-      PopChar(nest);
-      list := result;
+      if (ch in [')', ']', '}']) then
+        begin
+	  res := null; NextChar(ch);
+	end
+      else if ReadNext(car).kind = kERR then res := car
+      else if ReadList(cdr, false).kind = kERR then res := cdr
+      else res := Cons(car, cdr);
+      if AtHead then PopChar(nest);
+      result := res;
+      // debug('List -> ' + k2s(res.kind) + ' : ' + ShowItem(res));
     end; { ReadList }
-  
+
   function ReadQuote : TItem;
     begin
+      NextChar(ch);
       if ReadNext(result).kind <> kERR
 	then result := Cons(Item(kSym, Sym('quote')), result)
     end; { ReadQuote }
-  
+
   begin
     SkipCommentsAndWhitespace;
     case ch of
-      '(','[','{' : ReadList(result);
+      '(','[','{' : ReadList(result, true);
       ')',']','}' : result := ReadListEnd;
       '"'	  : result := ReadString;
       ''''	  : result := ReadQuote;
@@ -170,23 +238,36 @@ function Eval( item : TItem ) : TItem;
     result := item
   end;
 
+function DumpCell( ref : TItem ): string;
+  var cell : TCell;
+  begin
+    cell := cels[ ref.data ];
+    result :=
+      'Cons(' +
+      k2s(cell.car.kind) + ':' + n2s(cell.car.data) + ',' +
+      k2s(cell.cdr.kind) + ':' + n2s(cell.cdr.data) + '):' +
+      n2s(ref.data);
+  end; { DumpCell }
+
 function ShowItem( item : TItem ) : string;
 
   function ShowList( ref : TItem; AtHead : boolean) : string;
     var cell : TCell;
     begin
+      // debug('ShowList:' + DumpCell(ref));
       if AtHead then result := '(' else result := ' ';
       cell := cels[ ref.data ];
       result += ShowItem( cell.car );
       case cell.cdr.kind of
 	kNUL : AppendStr( result, ')' );
 	kCEL : AppendStr( result, ShowList( cell.cdr, false ));
-	else   AppendStr( result, '. ' + ShowItem( cell.cdr ));
+	else   AppendStr( result, ' . ' + ShowItem( cell.cdr ) + ')');
       end;
     end; { ShowList }
 
   begin
     case item.kind of
+      KNUL,
       kERR,
       kSYM : result := syms[ item.data ];
       kSTR : result := '"' + syms[ item.data ] + '"';
@@ -205,7 +286,7 @@ begin
   syms := TSymTbl.Create;
   cels := TCelTbl.Create;
   vals := TValTbl.Create;
-  null := Item(kNUL, 0);
+  null := Item(kNUL, Sym('()'));
   repeat Print(Eval(ReadNext(val)))
   until (val.kind = kERR)
 end.
