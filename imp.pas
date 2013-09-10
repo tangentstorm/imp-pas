@@ -1,3 +1,9 @@
+// -------------------------------------------------------------
+// implish: an imperative meta-programming language.
+//
+// Copyright 2013 Michal J Wallace <http://tangentstorm.com/>
+// Avaliable to the public for use under the MIT/X11 License.
+// -------------------------------------------------------------
 {$mode objfpc}{$i xpc.inc}
 program imp(input, output);
 uses xpc, arrays, stacks, ascii, sysutils, num;
