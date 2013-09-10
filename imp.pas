@@ -1,25 +1,24 @@
 {$mode objfpc}{$i xpc.inc}
-program minlisp(input, output);
-uses xpc, arrays, ascii, sysutils, num;
+program imp(input, output);
+uses xpc, arrays, stacks, ascii, sysutils, num;
 
 type
-  TKind	= (kNUL, kERR, kINT, kSYM, kSTR, kCEL);
-  TItem	= record
-	    kind : TKind;
-	    data : integer;
-	  end;
-  TCell	= record
-	    car, cdr : TItem
-	  end;
-  TBind	= record // variable binding
-	    symid : cardinal;
-	    attrs : TItem;
-	    value : TItem;
-	  end;
+  TKind = (kNUL, kERR, kINT, kSYM, kSTR, kCEL);
+  TItem = record
+            kind : TKind;
+            data : integer;
+          end;
+  TCell = record
+            car, cdr : TItem
+          end;
+  TBind = record // name bindings.
+            iden : integer; // index of a string
+            cell : TCell;   // car=value cdr=attributes
+          end;
   TSymTbl = specialize GEqArray<string>;
   TValTbl = specialize GArray<TBind>;
   TCelTbl = specialize GArray<TCell>;
-  TFunc	= function( cell : TCell ) : TCell;
+  TFunc   = function( item : TItem ) : TItem;
 
 var
   ch   : char = #0;
@@ -27,8 +26,9 @@ var
   syms : TSymTbl;
   cels : TCelTbl;
   vals : TValTbl;
-  null : TItem;
-
+var { common symbols }
+  NullSym : TItem;
+  TrueSym : TItem;
 const
   whitespace  = [#0..' '];
   stopchars   = whitespace + ['(',')','[',']','{','}', '"', ''''];
@@ -37,9 +37,9 @@ const
   prompt1     = '...> ';
 
 var
-  line	 : string;
+  line   : string;
   lx, ly : cardinal;
-  done	 : boolean = false;
+  done   : boolean = false;
 
 function k2s( kind :  TKind ) : string;
   begin
@@ -75,20 +75,20 @@ function NextChar( var ch : char ) : char;
     begin
       { write the prompt first, because eof() blocks. }
       if length(nest) > 0
-	then write( nest, prompt1 )
+        then write( nest, prompt1 )
         else write( prompt0 );
       if eof then begin
-	ch := ascii.EOT;
-	line := ch;
-	done := true;
-	if depth > 0 then error( 'unexpected end of file' );
-	writeln;
-	halt; { todo : remove this once depth-checking works correctly }
+        ch := ascii.EOT;
+        line := ch;
+        done := true;
+        if depth > 0 then error( 'unexpected end of file' );
+        writeln;
+        halt; { todo : remove this once depth-checking works correctly }
       end else begin
-	readln( line );
-	line := line + ascii.LF; { so we can do proper lookahead. }
-	inc( ly );
-	lx := 0;
+        readln( line );
+        line := line + ascii.LF; { so we can do proper lookahead. }
+        inc( ly );
+        lx := 0;
       end
     end;
   begin
@@ -157,12 +157,12 @@ function ReadString : TItem;
     AppendStr(nest, '"');
     while NextChar(ch) <> '"' do
       if ch = '\' then
-	case NextChar(ch) of
-	  '0' : s := s + #0;
-	  't' : s := s + ^I;
-	  'n' : s := s + LineEnding;
-	  else s := s + ch;
-	end
+        case NextChar(ch) of
+          '0' : s := s + #0;
+          't' : s := s + ^I;
+          'n' : s := s + LineEnding;
+          else s := s + ch;
+        end
       else s := s + ch;
     PopChar(nest); NextChar(ch);
     result := Item(kSTR, Sym(s))
@@ -172,7 +172,7 @@ procedure SkipCommentsAndWhitespace;
   begin
     while ch in whitespace do
       if NextChar(ch) = commentChar then
-	repeat until NextChar(ch) = ascii.LF
+        repeat until NextChar(ch) = ascii.LF
   end;
 
 function ReadListEnd : TItem;
@@ -182,14 +182,14 @@ function ReadListEnd : TItem;
       result := Item(kERR, Sym('Unexpected char: ' + ch))
     else begin
       case PopChar(nest) of
-	'{' : expect := '}';
-	'[' : expect := ']';
-	'(' : expect := ')';
-	else expect := '?' // should never happen
+        '{' : expect := '}';
+        '[' : expect := ']';
+        '(' : expect := ')';
+        else expect := '?' // should never happen
       end;
-      if ch = expect then result := null
+      if ch = expect then result := NullSym
       else result := Item(kERR, Sym('List end mismatch. Expected: '
-			 + expect + ', got: ' + ch));
+                         + expect + ', got: ' + ch));
     end;
     NextChar(ch);
   end; { ReadListEnd }
@@ -204,8 +204,8 @@ function ReadNext( out value : TItem ): TItem;
       SkipCommentsAndWhitespace;
       if (ch in [')', ']', '}']) then
         begin
-	  res := null; NextChar(ch);
-	end
+          res := NullSym; NextChar(ch);
+        end
       else if ReadNext(car).kind = kERR then res := car
       else if ReadList(cdr, false).kind = kERR then res := cdr
       else res := Cons(car, cdr);
@@ -218,7 +218,7 @@ function ReadNext( out value : TItem ): TItem;
     begin
       NextChar(ch);
       if ReadNext(result).kind <> kERR
-	then result := Cons(Item(kSym, Sym('quote')), result)
+        then result := Cons(Item(kSym, Sym('quote')), result)
     end; { ReadQuote }
 
   begin
@@ -226,8 +226,8 @@ function ReadNext( out value : TItem ): TItem;
     case ch of
       '(','[','{' : ReadList(result, true);
       ')',']','}' : result := ReadListEnd;
-      '"'	  : result := ReadString;
-      ''''	  : result := ReadQuote;
+      '"'         : result := ReadString;
+      ''''        : result := ReadQuote;
       else result := ReadAtom;
     end;
     value := result;
@@ -259,9 +259,9 @@ function ShowItem( item : TItem ) : string;
       cell := cels[ ref.data ];
       result += ShowItem( cell.car );
       case cell.cdr.kind of
-	kNUL : AppendStr( result, ')' );
-	kCEL : AppendStr( result, ShowList( cell.cdr, false ));
-	else   AppendStr( result, ' . ' + ShowItem( cell.cdr ) + ')');
+        kNUL : AppendStr( result, ')' );
+        kCEL : AppendStr( result, ShowList( cell.cdr, false ));
+        else   AppendStr( result, ' . ' + ShowItem( cell.cdr ) + ')');
       end;
     end; { ShowList }
 
@@ -286,7 +286,8 @@ begin
   syms := TSymTbl.Create;
   cels := TCelTbl.Create;
   vals := TValTbl.Create;
-  null := Item(kNUL, Sym('()'));
+  NullSym := Item(kNUL, Sym('()'));
+  TrueSym := Item(kSYM, Sym('T'));
   repeat Print(Eval(ReadNext(val)))
   until (val.kind = kERR)
 end.
