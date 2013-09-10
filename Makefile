@@ -6,6 +6,10 @@ targets:
 	@echo 'available targets:'
 	@echo '--------------------------'
 	@echo 'make imp     -> build ./gen/imp'
+	@echo 'make run     -> build and run ./gen/imp'
+
+run: imp
+	$(GEN)/imp
 
 imp: init
 	$(FPC) imp.pas
