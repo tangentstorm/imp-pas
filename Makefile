@@ -6,13 +6,9 @@ targets:
 	@echo 'available targets:'
 	@echo '--------------------------'
 	@echo 'make imp     -> build ./gen/imp'
-	@echo 'make impread -> build ./gen/impread'
 
 imp: init
 	$(FPC) imp.pas
-
-impread: init
-	$(FPC) impread.pas
 
 init: lib/xpl
 	@mkdir -p $(GEN)
