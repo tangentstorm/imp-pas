@@ -1,3 +1,6 @@
 [submodule "lib/xpl"]
 	path = lib/xpl
 	url = git@github.com:tangentstorm/xpl.git
+[submodule "lib/pl0rx"]
+	path = lib/pl0rx
+	url = https://github.com/tangentstorm/PL0-Language-Tools
