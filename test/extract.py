@@ -80,14 +80,14 @@ class TestReaderStateMachine:
     def on_test_name(self, line):
         self.next_name = line.split(":")[1].strip()
         assert self.next_name not in self.test_names, (
-            "duplicate name {0:r} on line {0}"
-            .format(self.next_name, self.lineno))
+            "duplicate name {0:r} at {1}:{2}"
+            .format(self.next_name, self.test_path, self.lineno))
         self.test_names.append(self.next_name)
 
     def on_begin_test(self, line):
         assert self.next_name != self.prev_name, (
-            "missing or duplicate name for test on line {0}"
-            .format(self.lineno))
+            "missing or duplicate test name at {0}:{1}"
+            .format(self.test_path, self.lineno))
         self.tests.append(TestDescription(self.next_name, []))
         self.focus = self.tests[-1].lines
         self.prev_name = self.next_name
@@ -105,6 +105,7 @@ class TestReaderStateMachine:
         Generates a sequence of TestDescription named tuples:
         Format is: (name:Str, lines:[Str])
         """
+        self.test_path = path
         map(self, open(path))
         return self.tests
 

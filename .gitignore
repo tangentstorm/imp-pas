@@ -5,7 +5,7 @@ gen/
 *.ppu
 *.gpi
 *.bak
-
+*.pyc
 
 fp___.err
 fp___.out

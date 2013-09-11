@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+usage: orgtest.py program_path testfile_path
+"""
 # test runner based on learntris
 from __future__ import print_function # let's keep it 3.x compatible
 import sys, os, glob, subprocess, difflib, pprint, time
@@ -79,9 +82,9 @@ def run_test(program, opcodes):
         raise TestFailure('output mismatch:\n%s'
                           % pprint.pformat(diff))
 
-def run_tests(program_name):
-    for i, test in enumerate(extract.tests()):
-        program = spawn(program_name)
+def run_tests(program_path, testfile_path):
+    for i, test in enumerate(extract.tests(testfile_path)):
+        program = spawn(program_path)
         opcodes = list(parse_test(test.lines))
         print("Running test %d: %s" % (i+1, test.name))
         try:
@@ -92,23 +95,23 @@ def run_tests(program_name):
             break
         print("\n") # add 2 blank lines between tests
 
-def find_program():
-    default = "./program"
-    path = sys.argv[1] if len(sys.argv) == 2 else default
+
+def check_path(path):
     if os.path.exists(path):
-        result = path
+        return True
     else:
-        result = None
-        if path == default:
-            print(__doc__)
-        else:
-            print("Error: ('%s') not found." % path)
-    return result
+        print("Error: ('%s') not found." % path)
+        return False
 
 
 def main():
-    path = find_program()
-    if path: run_tests(path)
+    try:
+        _, program, testfile = sys.argv
+    except:
+        print(__doc__)
+    else:
+        if check_path(program) and check_path(testfile):
+            run_tests(program, testfile)
 
 if __name__ == '__main__':
     main()

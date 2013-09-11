@@ -7,12 +7,16 @@ targets:
 	@echo '--------------------------'
 	@echo 'make imp     -> build ./gen/imp'
 	@echo 'make run     -> build and run ./gen/imp'
+	@echo 'make test    -> build and test ./gen/imp'
+
+imp: init
+	$(FPC) imp.pas
 
 run: imp
 	$(GEN)/imp
 
-imp: init
-	$(FPC) imp.pas
+test: imp
+	test/orgtest.py $(GEN)/imp test/lisptests.org
 
 init: lib/xpl
 	@mkdir -p $(GEN)
