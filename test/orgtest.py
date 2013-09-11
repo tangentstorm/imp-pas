@@ -65,7 +65,7 @@ def run_test(program, opcodes):
     for cmd in given:
         print(cmd)
         program.stdin.write(cmd + "\n")
-
+    program.stdin.close()
     # let the program do its thing:
     print("---- expected results ----")
     for line in expected:
