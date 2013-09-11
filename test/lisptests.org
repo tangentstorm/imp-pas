@@ -5,39 +5,47 @@
 
 * s-expressions
 
-#+name: s-expressions
+#+name: sxp.ints
 #+begin_src
-> #! fmt: struct
+> \#%fmt:struct
+> 1
+n:1
 > 123
 n:123
 > -123
 n:-123
-> 1
-n:1
+#+end_src
+
+#+name: sxp.syms
+#+begin_src
+> \#%fmt:struct
 > ()
-()
+s:()
 # this next one will parse but just get treated as a symbol.
 > 3.14159265358
 s:3.14159265358
 > (hi)
-(s:hi . ())
+(s:hi . s:())
 > (-hi)
-(s:-hi . ())
+(s:-hi . s:())
+> -
+s:-
 > (-)
+(s:- . s:())
 > x
-x
+s:x
 > (1)
-(1. ())
+(n:1 . s:())
 > (hi there)
-(s:hi . (s:there . ()))
+(s:hi . (s:there . s:()))
 > (1 (2) 3)
-(1 . ((2 . ()) . (3 . ())))
+(n:1 . ((n:2 . s:()) . (n:3 . s:())))
 > (hi (there) you!)
-(s:hi . ((s:there . ()) . (s:you! . ())))
+(s:hi . ((s:there . s:()) . (s:you! . s:())))
 > (hi 123456)
-(s:hi . (n:123456 . ()))
+(s:hi . (n:123456 . s:()))
 > (hi (there (fellow (human-bot!))))
-(s:hi . (s:there . (s:fellow (s:human-bot! . ()) . ()) . ()) . ())
+(s:hi . ((s:there . ((s:fellow . ((s:human-bot! . s:()) . s:())) . s:())) . s:()))
 #+end_src
 
 * strings
