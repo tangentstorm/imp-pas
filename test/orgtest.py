@@ -4,7 +4,7 @@ usage: orgtest.py program_path testfile_path
 """
 # test runner based on learntris
 from __future__ import print_function # let's keep it 3.x compatible
-import sys, os, glob, subprocess, difflib, pprint, time
+import sys, os, glob, subprocess, difflib, pprint, time, re
 import extract
 
 class TestFailure(Exception):
@@ -17,14 +17,15 @@ class TestFailure(Exception):
 class TimeoutFailure(TestFailure):
     pass
 
-
+commentPattern = re.compile(r"(?<!\\)#.*")
 def parse_test(lines):
     """
     :: [Str] -> [(Op, Str)] , where Op in { 'in', 'out' }
     """
     for line in lines:
-        if '#' in line:                # strip comments
-            line = line[:line.find('#')]
+        # strip comments, but leave \# intact.
+        line = commentPattern.sub("", line)
+        line = line.replace(r"\#", "#")
         sline = line.strip()
         if sline == "":                # skip empty lines
             pass
