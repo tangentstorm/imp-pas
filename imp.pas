@@ -6,7 +6,7 @@
 // -------------------------------------------------------------
 {$mode objfpc}{$i xpc.inc}
 program imp(input, output);
-uses xpc, arrays, stacks, ascii, sysutils, num;
+uses xpc, arrays, stacks, ascii, sysutils, strutils, num;
 
 type
   TKind = (kNUL, kERR, kINT, kSYM, kSTR, kCEL);
@@ -42,6 +42,11 @@ const
   prompt0     = 'imp> ';
   prompt1     = '...> ';
 
+type
+  TFormat = (fmtLisp, fmtStruct);
+var
+  debugging : boolean = true;
+  ShowFormat : TFormat = fmtLisp;
 var
   line   : string;
   lx, ly : cardinal;
@@ -58,7 +63,6 @@ function k2s( kind :  TKind ) : string;
     end
   end;
 
-var debugging : boolean = true;
 procedure debug( msg : string ); inline;
   begin
     if debugging then writeln( msg )
@@ -80,9 +84,13 @@ function NextChar( var ch : char ) : char;
   procedure prompt;
     begin
       { write the prompt first, because eof() blocks. }
+      {$IFDEF NOPROMPT}
+      {$NOTE compiling without prompt}
+      {$ELSE}
       if length(nest) > 0
         then write( nest, prompt1 )
         else write( prompt0 );
+      {$ENDIF}
       if eof then begin
         ch := ascii.EOT;
         line := ch;
@@ -174,11 +182,19 @@ function ReadString : TItem;
     result := Item(kSTR, Sym(s))
   end;
 
+procedure HandleDirective;
+  var s : string;
+  begin
+    while ch <> ascii.LF do s += NextChar(ch);
+    if AnsiStartsStr('fmt:struct', s) then showFormat := fmtStruct;
+  end;
+
 procedure SkipCommentsAndWhitespace;
   begin
     while ch in whitespace do
       if NextChar(ch) = commentChar then
-        repeat until NextChar(ch) = ascii.LF
+        if NextChar(ch) = '%' then HandleDirective
+        else while ch <> ascii.LF do NextChar(ch);
   end;
 
 function ReadListEnd : TItem;
@@ -264,7 +280,9 @@ function ShowItem( item : TItem ) : string;
       if AtHead then result := '(' else result := ' ';
       cell := cels[ ref.data ];
       result += ShowItem( cell.car );
-      case cell.cdr.kind of
+      if showFormat = fmtStruct then
+        AppendStr( result, ' . ' + ShowItem( cell.cdr ) + ')')
+      else case cell.cdr.kind of
         kNUL : AppendStr( result, ')' );
         kCEL : AppendStr( result, ShowList( cell.cdr, false ));
         else   AppendStr( result, ' . ' + ShowItem( cell.cdr ) + ')');
@@ -279,7 +297,16 @@ function ShowItem( item : TItem ) : string;
       kSTR : result := '"' + syms[ item.data ] + '"';
       kINT : result := IntToStr( item.data );
       kCEL : result := ShowList( item, true );
-    end
+    end;
+    if showFormat = fmtStruct then
+      case item.kind of
+        KNUL,
+        kERR,
+        kSYM,
+        kSTR : result := 's:' + result;
+        kINT : result := 'n:' + result;
+        kCEL : result := ShowList( item, true );
+      end;
   end; { ShowItem }
 
 procedure Print( item : TItem );
