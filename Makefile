@@ -7,7 +7,8 @@ targets:
 	@echo '--------------------------'
 	@echo 'make imp     -> build ./gen/imp'
 	@echo 'make run     -> build and run ./gen/imp'
-	@echo 'make test    -> build and test ./gen/imp'
+	@echo 'make imp     -> build ./gen/impraw (no prompt version)'
+	@echo 'make test    -> build and test ./gen/impraw'
 
 imp: init
 	$(FPC) imp.pas
@@ -15,8 +16,11 @@ imp: init
 run: imp
 	$(GEN)/imp
 
-test: imp
-	test/orgtest.py $(GEN)/imp test/lisptests.org
+impraw:
+	$(FPC) -dNOPROMPT -vn imp.pas -oimpraw
+
+test: impraw
+	test/orgtest.py $(GEN)/impraw test/lisptests.org
 
 init: lib/xpl
 	@mkdir -p $(GEN)
