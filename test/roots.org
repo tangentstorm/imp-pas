@@ -1,0 +1,92 @@
+
+* paul graham's examples from "the roots of lisp"
+
+** 1. Seven core primitives.
+*** 1. (quote x) : expr
+#+begin_src
+> (quote a)
+a
+> 'a
+a
+> (quote (a b c))
+(a b c)
+#+end_src
+
+*** 2. (atom x) : boolean
+
+#+begin_src
+> (atom 'a)
+t
+> (atom '(a b c))
+()
+> (atom '())
+t
+#+end_src
+
+what quote is for:
+
+#+begin_src 
+> (atom (atom 'a))
+t
+> (atom '(atom 'a))
+()
+#+end_src
+
+*** 3. (eq x y)
+
+#+begin_src 
+> (eq 'a 'a)
+t
+> (eq 'a 'b)
+()
+> (eq '() '())
+t
+#+end_src
+
+*** 4. (car x)
+#+begin_src 
+> (car '(a b c))
+#+end_src
+
+*** 5. (cdr x)
+#+begin_src 
+> (cdr '(a b c))
+(b c)
+#+end_src
+
+*** 6. (cons x y)
+#+begin_src
+> (cons 'a '(b c))
+(a b c)
+> (cons 'a (cons 'b (cons 'c '())))
+(a b c)
+> (car (cons 'a '(b c)))
+a
+> (cdr (cons 'a '(b c)))
+(a b c)
+#+end_src
+
+*** 7. cond
+#+begin_src
+> (cond ((eq 'a 'b) 'first) ((atom 'a) 'second))
+second
+#+end_src
+
+** 2. Denoting functions
+#+begin_src
+> ((lambda (x) (cons x '(b))) 'a)
+(a b)
+> ((lambda (x y)) (cons x (cdr y)) 'z '(a b c))
+(z b c)
+#+end_src
+
+#+begin_src lisp
+  (defun subst (x y z)
+    (cond ((atom z)
+           (cond ((eq z y) x)
+                 ('t z)
+                 ('t (cons (subst x y (car z))
+                           (subst x y (cdr z))))))))
+> (subst 'm 'b '(a b (a b c) d ))
+(a m (a m c) d)
+#+end_src
