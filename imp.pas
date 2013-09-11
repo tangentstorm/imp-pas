@@ -114,7 +114,7 @@ function NextChar( var ch : char ) : char;
     result := ch;
   end; { NextChar( ch ) }
 
-function Item( kind : TKind; data : cardinal ) : TItem;
+function Item( kind : TKind; data : integer ) : TItem;
   begin
     result.kind := kind;
     result.data := data;
@@ -138,7 +138,8 @@ function IsNum( s : string; out num : integer ) : boolean;
   var i : cardinal = 1; negate : boolean = false;
   begin
     result := true; num := 0;
-    if s[1] = '-' then begin inc(i); negate := true; end;
+    if (s[1] = '-') and (length(s) > 1) then
+      begin inc(i); negate := true; end;
     while result and (i <= length(s)) do begin
       if s[i] in ['0'..'9'] then num := num * 10 + ord(s[i]) - ord('0')
       else result := false;
