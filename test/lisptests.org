@@ -56,48 +56,50 @@ s:x
 ""
 > "string"
 "string"
-> "hi	there"
-"hi\tthere"
+> "hi\tthere"
+"hi	there"
 > "a\\b"
 "a\b"
 > ("hello" "world")
-("hello" . ("world" . ()))
-# whitespace tests
+("hello" "world")
+#+end_src
+
+#+name: strings.whitespace
+#+begin_src
 >  (  1  )
-(1 . ())
+(1)
 >   (  (  )  )
-(() . ())
+(())
 >
 >
 > (
-> 
-> 
+>
+>
 > )
 >
 >
-(() . ())
+()
 >
 >
 > (
-> 
+>
 >
 > 123
 >
 > )
 >
-(123 . ())
+(123)
 #+end_src
-
 
 * identity function
 
 #+name: id
 #+begin_src
-> (eval '123)
+> (id 123)
 123
-> (eval '(id 123))
+> (id (id 123))
 123
-> (eval '(id (id (id 123))))
+> (id (id (id (id 123))))
 123
 #+end_src
 
@@ -107,8 +109,12 @@ s:x
 #+begin_src
 > (id "hi")
 "hi"
-> (car (cons "a" "b"))
-"a"
+#+end_src
+
+#+name: id.is-evaluated
+#+begin_src
+> (id (cons "a" "b")))
+("a" "b")
 #+end_src
 
 * cons
