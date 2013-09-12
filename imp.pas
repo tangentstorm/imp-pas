@@ -15,7 +15,7 @@ procedure halt( msg : string );
   end;
 
 //== meta model ================================================
-//
+
 // The model presented here is largely based on John McCarthy's
 // LISP system, described in his 1960 paper, "Recursive Functions
 // of Symbolic Expressions and Their Computation by Machine, Part I"
@@ -24,9 +24,9 @@ procedure halt( msg : string );
 // Specifically, we're translating this page:
 //
 //    http://www-formal.stanford.edu/jmc/recursive/node3.html
-//
+
 //-- a. symbolic expressions -----------------------------------
-//
+
 // In order to work with several kinds of symbolic expressions,
 // we adopt a universal representation, consisting of a 'kind'
 // marker and an integer.
@@ -87,6 +87,7 @@ type TCellTbl = specialize arrays.GArray<TCell>;
 var cells : TCellTbl;
 
 //-- b. meta-functions ---------------------------------------
+
 // McCarthy used the m-expression syntax as a meta-language to
 // describe how to evaluate S-expressions. ('m' is for 'meta')
 // Since we're using pascal for our meta language, we translate
@@ -130,7 +131,7 @@ function Meta( f : TMetaFun ) : TExpr;
 //
 // The M prefix used in these routines is short for 'meta', since
 // we're using pascal as a meta-language to describe lisp. As a
-// convention, I will also type meta function names in ALL CAPS.
+// convention, we will also type meta function names in ALL CAPS.
 
 // 1. atom[x] -> T if x is an atom, else F
 function MATOM( x : TExpr ) : boolean;
@@ -171,6 +172,60 @@ function MCONS( x, y : TExpr ) : TExpr;
     result := Sx( kCEL, cells.Append( cell ));
   end; { MCons }
 
+// - predicates - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// McCarthy's first two elementary expressions translated to the
+// type (TExpr -> boolean) so that we could use them in pascal,
+// but it would be nice to use also treat them as (TExpr -> TExpr)
+// so that we can add them to the 'metas' table.
+
+// In order to do this, we will provide pascal names for the
+// symbols T and F. In modern lisp, F is written as () or NIL,
+// representing both falsehood and the empty list. Since these
+// result in a syntax error and a type error in pascal (NIL is
+// already defined as the default pointer value), we will call
+// the symbol NULL.
+
+var { boolean symbols }
+  mNULL : TExpr;
+  mTRUE : TExpr;
+
+// We will call this routine at startup to initialize them:
+procedure CreateBooleans;
+  begin
+    mNULL := Sx(kNUL, Key('()'));
+    mTRUE := Sx(kSYM, Key('T'));
+  end;
+
+// To translate:
+
+// EnBool encodes a pascal boolean as an s-expression:
+function EnBool( b : boolean ) : TExpr;
+  begin
+    if b then result := mTRUE else result := mNULL
+  end;
+
+// ExBool extracts a pascal boolean from an s-expression.
+function ExBool( x : TExpr ) : boolean;
+  begin
+    result := x.kind <> kNUL
+  end;
+
+// We can now define new versions of MATOM and MEQ as TExpr->TExpr.
+// Following lisp tradiion, the P suffix is used both as an
+// abbreviation for the word 'predicate' and for its resemblence
+// to a question mark.
+
+function MATOMP( x : TExpr ) : TExpr;
+  begin
+    result := EnBool( MATOM( x ))
+  end;
+
+function MEQP( x, y : TExpr ) : TExpr;
+  begin
+    result := EnBool( MEQ( x, y ))
+  end;
+
 //-- d. recursive meta-expressions -----------------------------
 
 // - functions - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -186,9 +241,6 @@ var
   nest : string = '';
 
   defs : TDefTbl;
-var { common symbols }
-  NullSym : TExpr;
-  TrueSym : TExpr;
 const
   whitespace  = [#0..' '];
   stopchars   = whitespace + ['(',')','[',']','{','}', '"', ''''];
@@ -347,7 +399,7 @@ function ReadListEnd : TExpr;
         '(' : expect := ')';
         else expect := '?' // should never happen
       end;
-      if ch = expect then result := NullSym
+      if ch = expect then result := mNULL
       else result := Sx(kERR, Key('List end mismatch. Expected: '
                          + expect + ', got: ' + ch));
     end;
@@ -364,7 +416,7 @@ function ReadNext( out value : TExpr ): TExpr;
       SkipCommentsAndWhitespace;
       if (ch in [')', ']', '}']) then
         begin
-          res := NullSym; NextChar(ch);
+          res := mNULL; NextChar(ch);
         end
       else if ReadNext(car).kind = kERR then res := car
       else if ReadList(cdr, false).kind = kERR then res := cdr
@@ -485,8 +537,7 @@ begin
   syms := TSymTbl.Create;
   cells := TCellTbl.Create;
   defs := TDefTbl.Create;
-  NullSym := Sx(kNUL, Key('()'));
-  TrueSym := Sx(kSYM, Key('T'));
+  CreateBooleans;
   repeat Print(Eval(ReadNext(val)))
   until (val.kind = kERR)
 end.
