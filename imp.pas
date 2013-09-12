@@ -226,7 +226,161 @@ function MEQP( x, y : TExpr ) : TExpr;
     result := EnBool( MEQ( x, y ))
   end;
 
-//-- d. recursive meta-expressions -----------------------------
+//-- d. recursive meta-functions -------------------------------
+
+// 1. ff[x] -> first atomic symbol in f, ignoring parentheses.
+// Perhaps this is an abbreviation for "find first".
+function MFF( x : TExpr ) : TExpr;
+  begin
+    if MATOM(x) then result := x else result := MFF(MCAR(x))
+  end;
+
+// 2. subst[x;y;z] -> copy z, replacing each occurrence of y with x.
+function MSUBST( x, y, z : TExpr ) : TExpr;
+  begin
+    if MATOM(z) then
+      if MEQ(z, y) then result := x
+      else result := z
+    else result := MCONS(MSUBST(x, y, MCAR(z)),
+                         MSUBST(x, y, MCDR(z)))
+  end;
+
+// 3. equal[x;y] -> T if x and y are the same, else F
+function MEQUAL( x, y : TExpr ) : TExpr;
+  begin
+    result := EnBool(
+      ( MATOM(x) and MATOM(y) and MEQ(x, y) )
+      or ( not ( MATOM(x) or MATOM(y) )
+           and MEQ(MCAR(x), MCAR(y))
+           and MEQ(MCDR(x), MCDR(y)) ) )
+  end;
+
+// 4. null?(x) -> T if x = NIL else F
+// mNULL is already the name of the constant so this
+// one breaks the naming convention a bit.
+function NULLP( x : TExpr ) : boolean;
+  begin
+    result := MEQ(x, mNULL)
+  end;
+
+// here is the reified version:
+function MNULLP( x : TExpr ) : TExpr;
+  begin
+    result := MEQP(x, mNULL)
+  end;
+
+// - abbreviations - - - - - - - - - - - - - - - - - - - - - - -
+
+// caar[x] -> car[car[x]]
+function MCAAR( x : TExpr ) : TExpr;
+  begin
+    result := MCAR(MCAR(x))
+  end;
+
+// cadr[x] -> car[cdr[x]]
+function MCADR( x : TExpr ) : TExpr;
+  begin
+    result := MCAR(MCDR(x))
+  end;
+
+// cadar[x] -> car[cdr[cdr[x]]]
+function MCADAR( x : TExpr ) : TExpr;
+  begin
+    result := MCAR(MCDR(MCAR(x)))
+  end;
+
+// caddr[x] -> car[cdr[cdr[x]]]
+function MCADDR( x : TExpr ) : TExpr;
+  begin
+    result := MCAR(MCDR(MCDR(x)))
+  end;
+
+// - list builder - - - - - - - - - - - - - - - - - - - - - - - -
+// We'll define MLIST for up to 10 items, as a convenience for
+// people writing meta-extensions in pascal.
+
+function MLIST( a : TExpr ) : TExpr;
+  begin result := MCONS(a, mNULL) end;
+
+// MLIST with two arguments is the same as MCONS.
+function MLIST( a, b : TExpr ) : TExpr; inline;
+ begin result := MCONS(a, b) end;
+
+// After those two, each successive version can simply CONS
+// its first argument onto the MLIST of the other arguments.
+
+function MLIST( a, b, c : TExpr ) : TExpr;
+  begin result := MCONS(a, MLIST(b, c)) end;
+
+function MLIST( a, b, c, d : TExpr ) : TExpr;
+  begin result := MCONS(a, MLIST(b, c, d)) end;
+
+function MLIST( a, b, c, d, e : TExpr ) : TExpr;
+  begin result := MCONS(a, MLIST(b, c, d, e)) end;
+
+function MLIST( a, b, c, d, e, f : TExpr ) : TExpr;
+  begin result := MCONS(a, MLIST(b, c, d, e, f)) end;
+
+function MLIST( a, b, c, d, e, f, g : TExpr ) : TExpr;
+  begin result := MCONS(a, MLIST(b, c, d, e, f, g)) end;
+
+function MLIST( a, b, c, d, e, f, g, h : TExpr ) : TExpr;
+  begin result := MCONS(a, MLIST(b, c, d, e, f, g, h)) end;
+
+function MLIST( a, b, c, d, e, f, g, h, i : TExpr ) : TExpr;
+  begin result := MCONS(a, MLIST(b, c, d, e, f, g, h, i)) end;
+
+function MLIST( a, b, c, d, e, f, g, h, i, j : TExpr ) : TExpr;
+  begin result := MCONS(a, MLIST(b, c, d, e, f, g, h, i, j)) end;
+
+// - functions - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// append[x;y] -> append y to x
+function MAPPEND( x, y : TExpr ) : TExpr;
+  begin
+    if NULLP(x) then result := MLIST(x)
+    else result := MCONS(MCAR(x), MAPPEND(MCDR(x), y))
+  end;
+
+// among [x;y] = ~null[y] ^ [equal [x;car [y]] | among [x;cdr[y]]]
+// is x in list y?
+function MAMONG( x, y : TExpr ) : boolean;
+  begin
+    result := MEQ(x,MCAR(y)) or MAMONG(x, MCDR(y))
+  end;
+
+function MAMONGP( x, y : TExpr ) : TExpr;
+  begin
+    result := EnBool(MAMONG(x, y))
+  end;
+
+// zip -- McCarthy calls this 'pair'. 'zip' comes from haskell and python.
+function MZIP( x, y : TExpr ) : TExpr;
+  begin
+    if MATOM(x) or MATOM(y) then result := mNULL
+    else result := MCONS(MLIST(MCAR(x), MCAR(y)),
+                         MZIP(MCDR(x), MCDR(y)))
+  end;
+
+// assoc[x;y] look up x in dictionary y
+function MASSOC( x, y : TExpr ) : TExpr;
+  begin
+    if MEQ(MCAAR(y), x) then result := MCADAR(y)
+    else result := MASSOC(x, MCDR(y))
+  end;
+
+// sublis[x;y] -> subst uN->vN in y, where x=((u0,v0), (u1,v1)...)
+function MSUBLIS( x, y : TExpr ) : TExpr;
+  function SUB2( x, z : TExpr ) : TExpr;
+    begin
+      if NULLP(x) then result := z
+      else if MEQ(MCAAR(x), z) then result := MCADAR(x)
+      else result := SUB2(MCDR(x), z)
+    end;
+  begin { MSUBLIS }
+    if MATOM(x) then result := SUB2(x, y)
+    else result := MCONS(MSUBLIS(x, MCAR(y)), MSUBLIS(x, MCDR(y)))
+  end;
 
 // - functions - - - - - - - - - - - - - - - - - - - - - - - - -
 type
