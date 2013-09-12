@@ -9,7 +9,7 @@ program imp(input, output);
 uses xpc, arrays, stacks, ascii, sysutils, strutils, num;
 
 type
-  TKind = (kNUL, kERR, kINT, kSYM, kSTR, kCEL);
+  TKind = (kNUL, kERR, kINT, kSYM, kSTR, kCEL, kFUN);
   TItem = record
             kind : TKind;
             data : integer;
@@ -22,16 +22,18 @@ type
             cell : TCell;   // car=value cdr=attributes
           end;
   TSymTbl = specialize GEqArray<string>;
-  TValTbl = specialize GArray<TBind>;
+  TDefTbl = specialize GArray<TBind>;
   TCelTbl = specialize GArray<TCell>;
-  TFunc   = function( item : TItem ) : TItem;
+  TPasFun = function (var item : TItem) : TItem;
+  TFunTbl = array [0..31] of TPasFun;
 
 var
   ch   : char = #0;
   nest : string = '';
   syms : TSymTbl;
   cels : TCelTbl;
-  vals : TValTbl;
+  defs : TDefTbl;
+  funs : TFunTbl; funct : cardinal = 0;
 var { common symbols }
   NullSym : TItem;
   TrueSym : TItem;
@@ -60,6 +62,7 @@ function k2s( kind :  TKind ) : string;
       kERR : result := 'ERR';
       kINT : result := 'INT';
       kSTR : result := 'STR';
+      kFUN : result := 'FUN';
     end
   end;
 
@@ -67,6 +70,8 @@ procedure debug( msg : string ); inline;
   begin
     if debugging then writeln( msg )
   end;
+
+//-- read part -------------------------------------------------
 
 procedure error( const err: string );
   begin
@@ -120,6 +125,13 @@ function Item( kind : TKind; data : integer ) : TItem;
     result.data := data;
   end;
 
+function Fun( f : TPasFun ) : TItem;
+  begin
+    funs[funct] := f;
+    inc(funct);
+    if funct > high(funs) then error( 'out of function slots.' );
+  end;
+
 function Sym( s : string ) : cardinal;
   begin
     if not syms.Find( s, result ) then result := syms.Append( s );
@@ -130,7 +142,7 @@ function Cons( head, tail : TItem ) : TItem;
   begin
     cell.car := head;
     cell.cdr := tail;
-    result := Item( kCel, cels.Append( cell ));
+    result := Item( kCEL, cels.Append( cell ));
   end;
 
 // this recognizes decimal integers.
@@ -256,10 +268,36 @@ function ReadNext( out value : TItem ): TItem;
     value := result;
   end; { ReadNext }
 
-function Eval( item : TItem ) : TItem;
+//-- eval part -------------------------------------------------
+// The evaluator applies functions that are in the car of a cell
+// to that same cell's cdr.
+
+procedure Def( strid : cardinal; item : TItem );
+  var binding : TBind;
+  begin
+    binding.iden := strid;
+    binding.cell.car := item;
+    defs.Append( binding );
+  end;
+
+function FQuote( var item : TItem ) : TItem;
   begin
     result := item
   end;
+
+function Eval( itm : TItem ) : TItem;
+  begin
+    result := Item(kERR, Sym('Eval Error'));
+    if itm.kind = kCEL then with cels[ itm.data ] do
+      begin
+        if car.kind = kSTR then
+          if syms[car.data] = 'quote' then
+            result := FQuote(cdr)
+      end
+    else result := itm;
+  end;
+
+//-- print part ------------------------------------------------
 
 function DumpCell( ref : TItem ): string;
   var cell : TCell;
@@ -298,6 +336,7 @@ function ShowItem( item : TItem ) : string;
       kSTR : result := '"' + syms[ item.data ] + '"';
       kINT : result := IntToStr( item.data );
       kCEL : result := ShowList( item, true );
+      kFUN : result := '<' + IntToStr( item.data ) + '>';
     end;
     if showFormat = fmtStruct then
       case item.kind of
@@ -306,6 +345,7 @@ function ShowItem( item : TItem ) : string;
         kSYM,
         kSTR : result := 's:' + result;
         kINT : result := 'n:' + result;
+        kFUN : result := 'f:' + result;
         kCEL : result := ShowList( item, true );
       end;
   end; { ShowItem }
@@ -319,9 +359,10 @@ var val : TItem;
 begin
   syms := TSymTbl.Create;
   cels := TCelTbl.Create;
-  vals := TValTbl.Create;
+  defs := TDefTbl.Create;
   NullSym := Item(kNUL, Sym('()'));
   TrueSym := Item(kSYM, Sym('T'));
+  Def(Sym('quote'), Fun(@FQuote));
   repeat Print(Eval(ReadNext(val)))
   until (val.kind = kERR)
 end.
