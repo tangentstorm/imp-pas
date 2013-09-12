@@ -3,6 +3,7 @@
 
 ** 1. Seven core primitives.
 *** 1. (quote x) : expr
+#+name: roots.quote
 #+begin_src
 > (quote a)
 a
@@ -14,6 +15,7 @@ a
 
 *** 2. (atom x) : boolean
 
+#+name: roots.atom
 #+begin_src
 > (atom 'a)
 t
@@ -25,6 +27,7 @@ t
 
 what quote is for:
 
+#+name: roots.atom-quote
 #+begin_src 
 > (atom (atom 'a))
 t
@@ -34,6 +37,7 @@ t
 
 *** 3. (eq x y)
 
+#+name: roots.eq
 #+begin_src 
 > (eq 'a 'a)
 t
@@ -44,17 +48,20 @@ t
 #+end_src
 
 *** 4. (car x)
+#+name: roots.car
 #+begin_src 
 > (car '(a b c))
 #+end_src
 
 *** 5. (cdr x)
+#+name: roots.cdr
 #+begin_src 
 > (cdr '(a b c))
 (b c)
 #+end_src
 
 *** 6. (cons x y)
+#+name: roots.cons
 #+begin_src
 > (cons 'a '(b c))
 (a b c)
@@ -67,12 +74,14 @@ a
 #+end_src
 
 *** 7. cond
+#+name: roots.cond
 #+begin_src
 > (cond ((eq 'a 'b) 'first) ((atom 'a) 'second))
 second
 #+end_src
 
 ** 2. Denoting functions
+#+name: roots.fn
 #+begin_src
 > ((lambda (x) (cons x '(b))) 'a)
 (a b)
@@ -80,6 +89,10 @@ second
 (z b c)
 #+end_src
 
+** ----
+
+** subst
+#+name: etc.subst
 #+begin_src lisp
   (defun subst (x y z)
     (cond ((atom z)

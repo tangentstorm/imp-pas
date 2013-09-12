@@ -21,6 +21,8 @@ impraw:
 
 test: impraw
 	test/orgtest.py $(GEN)/impraw test/lisptests.org
+roots: impraw
+	test/orgtest.py $(GEN)/impraw test/roots.org
 
 init: lib/xpl
 	@mkdir -p $(GEN)
