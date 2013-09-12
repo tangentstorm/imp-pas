@@ -1,19 +1,68 @@
-// -------------------------------------------------------------
+//--------------------------------------------------------------
 // implish: an imperative meta-programming language.
 //
 // Copyright 2013 Michal J Wallace <http://tangentstorm.com/>
 // Avaliable to the public for use under the MIT/X11 License.
-// -------------------------------------------------------------
+//--------------------------------------------------------------
 {$mode objfpc}{$i xpc.inc}
 program imp(input, output);
 uses xpc, arrays, stacks, ascii, sysutils, strutils, num;
 
+//== meta model ================================================
+//
+// The model presented here is largely based on John McCarthy's
+// LISP system, described in his 1960 paper, "Recursive Functions
+// of Symbolic Expressions and Their Computation by Machine, Part I"
+// http://www-formal.stanford.edu/jmc/recursive/
+//
+//-- symbolic expressions --------------------------------------
+//
+// In order to work with several kinds of symbolic expressions,
+// we adopt a universal representation, consisting of a 'kind'
+// marker and an integer.
+//
+// When x.kind=kINT, x.data represents the integer itself. In all
+// other cases, the data field is either ignored or used as a key
+// to find the actual value in a lookup table.
 type
-  TKind = (kNUL, kERR, kINT, kSYM, kSTR, kCEL, kFUN);
+  TKind = (
+    kSYM,  // an symbol or 'atom', represented internally by a string
+    kNUL,  // NULL, a special symbol. Represents false and the empty list.
+    kERR,  // used to mark represent error conditions
+    kSTR,  // alternate symbol syntax with quotes to allow spaces
+    kINT,  // an integer
+    kCEL,  // a 'cons cell' (pair of sybols)
+    kFUN); // a primitive function, implemented in pascal
   TExpr = record
             kind : TKind;
             data : integer;
           end;
+
+// Sx() provides a universal constructor for s-expressions.
+function Sx( kind : TKind; data : integer ) : TExpr;
+  begin
+    result.kind := kind;
+    result.data := data;
+  end;
+
+// - atoms - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Any s-expression where kind<>kCEL is an atom.
+const atomic = [kSYM..kFUN] - [kCEL];
+
+// We can represent Symbols, NULL, Errors, and String atoms
+// as strings in pascal, and store values for all of them in
+// the same lookup table:
+type TSymTbl = specialize arrays.GEqArray<string>;
+var syms : TSymTbl;
+
+// Key() converts a string to an integer, representing its
+// position in the lookup table.
+function Key( s :  string ) : cardinal;
+  begin
+    if not syms.Find( s, result ) then result := syms.Append( s );
+  end;
+
+type
   TCell = record
             car, cdr : TExpr
           end;
@@ -21,16 +70,14 @@ type
             iden : integer; // index of a string
             cell : TCell;   // car=value cdr=attributes
           end;
-  TSymTbl = specialize GEqArray<string>;
-  TDefTbl = specialize GArray<TBind>;
-  TCelTbl = specialize GArray<TCell>;
+  TDefTbl = specialize arrays.GArray<TBind>;
+  TCelTbl = specialize arrays.GArray<TCell>;
   TPasFun = function (var expr : TExpr) : TExpr;
   TFunTbl = array [0..31] of TPasFun;
 
 var
   ch   : char = #0;
   nest : string = '';
-  syms : TSymTbl;
   cels : TCelTbl;
   defs : TDefTbl;
   funs : TFunTbl; funct : cardinal = 0;
@@ -71,7 +118,7 @@ procedure debug( msg : string ); inline;
     if debugging then writeln( msg )
   end;
 
-//-- read part -------------------------------------------------
+//== read part =================================================
 
 procedure error( const err: string );
   begin
@@ -119,22 +166,11 @@ function NextChar( var ch : char ) : char;
     result := ch;
   end; { NextChar( ch ) }
 
-function Sx( kind : TKind; data : integer ) : TExpr;
-  begin
-    result.kind := kind;
-    result.data := data;
-  end;
-
 function Fun( f : TPasFun ) : TExpr;
   begin
     funs[funct] := f;
     inc(funct);
     if funct > high(funs) then error( 'out of function slots.' );
-  end;
-
-function Sym( s : string ) : cardinal;
-  begin
-    if not syms.Find( s, result ) then result := syms.Append( s );
   end;
 
 function Cons( head, tail : TExpr ) : TExpr;
@@ -166,7 +202,7 @@ function ReadAtom : TExpr;
     repeat tok := tok + ch until NextChar(ch) in stopchars;
     if IsNum( tok, i )
       then result := Sx( kINT, i )
-      else result := Sx( kSYM, Sym( tok ))
+      else result := Sx( kSYM, Key( tok ))
   end;
 
 function PopChar( var s : string ) : char;
@@ -192,7 +228,7 @@ function ReadString : TExpr;
         end
       else s := s + ch;
     PopChar(nest); NextChar(ch);
-    result := Sx(kSTR, Sym(s))
+    result := Sx(kSTR, Key(s))
   end;
 
 procedure HandleDirective;
@@ -214,7 +250,7 @@ function ReadListEnd : TExpr;
   var expect : char;
   begin
     if Length(nest) = 0 then
-      result := Sx(kERR, Sym('Unexpected char: ' + ch))
+      result := Sx(kERR, Key('Unexpected char: ' + ch))
     else begin
       case PopChar(nest) of
         '{' : expect := '}';
@@ -223,7 +259,7 @@ function ReadListEnd : TExpr;
         else expect := '?' // should never happen
       end;
       if ch = expect then result := NullSym
-      else result := Sx(kERR, Sym('List end mismatch. Expected: '
+      else result := Sx(kERR, Key('List end mismatch. Expected: '
                          + expect + ', got: ' + ch));
     end;
     NextChar(ch);
@@ -253,7 +289,7 @@ function ReadNext( out value : TExpr ): TExpr;
     begin
       NextChar(ch);
       if ReadNext(result).kind <> kERR
-        then result := Cons(Sx(kSym, Sym('quote')), result)
+        then result := Cons(Sx(kSym, Key('quote')), result)
     end; { ReadQuote }
 
   begin
@@ -268,7 +304,7 @@ function ReadNext( out value : TExpr ): TExpr;
     value := result;
   end; { ReadNext }
 
-//-- eval part -------------------------------------------------
+//== eval part =================================================
 // The evaluator applies functions that are in the car of a cell
 // to that same cell's cdr.
 
@@ -287,7 +323,7 @@ function FQuote( var expr : TExpr ) : TExpr;
 
 function Eval( itm : TExpr ) : TExpr;
   begin
-    result := Sx(kERR, Sym('Eval Error'));
+    result := Sx(kERR, Key('Eval Error'));
     if itm.kind = kCEL then with cels[ itm.data ] do
       begin
         if car.kind = kSTR then
@@ -297,7 +333,7 @@ function Eval( itm : TExpr ) : TExpr;
     else result := itm;
   end;
 
-//-- print part ------------------------------------------------
+//== print part ================================================
 
 function DumpCell( ref : TExpr ): string;
   var cell : TCell;
@@ -360,9 +396,9 @@ begin
   syms := TSymTbl.Create;
   cels := TCelTbl.Create;
   defs := TDefTbl.Create;
-  NullSym := Sx(kNUL, Sym('()'));
-  TrueSym := Sx(kSYM, Sym('T'));
-  Def(Sym('quote'), Fun(@FQuote));
+  NullSym := Sx(kNUL, Key('()'));
+  TrueSym := Sx(kSYM, Key('T'));
+  Def(Key('quote'), Fun(@FQuote));
   repeat Print(Eval(ReadNext(val)))
   until (val.kind = kERR)
 end.
