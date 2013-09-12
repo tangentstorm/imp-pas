@@ -43,7 +43,7 @@ function Sx( kind : TKind; data : integer ) : TExpr;
   begin
     result.kind := kind;
     result.data := data;
-  end;
+  end; { Sx }
 
 // - atoms - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Any s-expression where kind<>kCEL is an atom.
@@ -60,25 +60,45 @@ var syms : TSymTbl;
 function Key( s :  string ) : cardinal;
   begin
     if not syms.Find( s, result ) then result := syms.Append( s );
-  end;
+  end; { Key }
 
+// - cells - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// An S-expression where kind=kCEL is a cell. Cells are simply
+// pairs of s-expressions. For historical reasons, these are
+// called car and cdr in lisp. Will use records to represent
+// the cells, and store them in a dynamic array.
 type
   TCell = record
             car, cdr : TExpr
-          end;
+	  end;
+
+// 'cells' is the the global table of cells.
+type TCellTbl = specialize arrays.GArray<TCell>;
+var cells : TCellTbl;
+
+// Cons() constructs a new cell from two s-expressions.
+function Cons( head, tail : TExpr ) : TExpr;
+  var cell : TCell;
+  begin
+    cell.car := head;
+    cell.cdr := tail;
+    result := Sx( kCEL, cells.Append( cell ));
+  end; { Cons }
+
+// - functions - - - - - - - - - - - - - - - - - - - - - - - - -
+type
   TBind = record // name bindings.
             iden : integer; // index of a string
             cell : TCell;   // car=value cdr=attributes
           end;
   TDefTbl = specialize arrays.GArray<TBind>;
-  TCelTbl = specialize arrays.GArray<TCell>;
   TPasFun = function (var expr : TExpr) : TExpr;
   TFunTbl = array [0..31] of TPasFun;
 
 var
   ch   : char = #0;
   nest : string = '';
-  cels : TCelTbl;
+
   defs : TDefTbl;
   funs : TFunTbl; funct : cardinal = 0;
 var { common symbols }
@@ -171,14 +191,6 @@ function Fun( f : TPasFun ) : TExpr;
     funs[funct] := f;
     inc(funct);
     if funct > high(funs) then error( 'out of function slots.' );
-  end;
-
-function Cons( head, tail : TExpr ) : TExpr;
-  var cell : TCell;
-  begin
-    cell.car := head;
-    cell.cdr := tail;
-    result := Sx( kCEL, cels.Append( cell ));
   end;
 
 // this recognizes decimal integers.
@@ -324,7 +336,7 @@ function FQuote( var expr : TExpr ) : TExpr;
 function Eval( itm : TExpr ) : TExpr;
   begin
     result := Sx(kERR, Key('Eval Error'));
-    if itm.kind = kCEL then with cels[ itm.data ] do
+    if itm.kind = kCEL then with cells[ itm.data ] do
       begin
         if car.kind = kSTR then
           if syms[car.data] = 'quote' then
@@ -338,7 +350,7 @@ function Eval( itm : TExpr ) : TExpr;
 function DumpCell( ref : TExpr ): string;
   var cell : TCell;
   begin
-    cell := cels[ ref.data ];
+    cell := cells[ ref.data ];
     result :=
       'Cons(' +
       k2s(cell.car.kind) + ':' + n2s(cell.car.data) + ',' +
@@ -353,7 +365,7 @@ function ShowExpr( expr : TExpr ) : string;
     begin
       // debug('ShowList:' + DumpCell(ref));
       if AtHead then result := '(' else result := ' ';
-      cell := cels[ ref.data ];
+      cell := cells[ ref.data ];
       result += ShowExpr( cell.car );
       if showFormat = fmtStruct then
         AppendStr( result, ' . ' + ShowExpr( cell.cdr ) + ')')
@@ -394,7 +406,7 @@ procedure Print( expr : TExpr );
 var val : TExpr;
 begin
   syms := TSymTbl.Create;
-  cels := TCelTbl.Create;
+  cells := TCellTbl.Create;
   defs := TDefTbl.Create;
   NullSym := Sx(kNUL, Key('()'));
   TrueSym := Sx(kSYM, Key('T'));
