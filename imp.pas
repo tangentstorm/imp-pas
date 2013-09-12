@@ -10,12 +10,12 @@ uses xpc, arrays, stacks, ascii, sysutils, strutils, num;
 
 type
   TKind = (kNUL, kERR, kINT, kSYM, kSTR, kCEL, kFUN);
-  TItem = record
+  TExpr = record
             kind : TKind;
             data : integer;
           end;
   TCell = record
-            car, cdr : TItem
+            car, cdr : TExpr
           end;
   TBind = record // name bindings.
             iden : integer; // index of a string
@@ -24,7 +24,7 @@ type
   TSymTbl = specialize GEqArray<string>;
   TDefTbl = specialize GArray<TBind>;
   TCelTbl = specialize GArray<TCell>;
-  TPasFun = function (var item : TItem) : TItem;
+  TPasFun = function (var expr : TExpr) : TExpr;
   TFunTbl = array [0..31] of TPasFun;
 
 var
@@ -35,8 +35,8 @@ var
   defs : TDefTbl;
   funs : TFunTbl; funct : cardinal = 0;
 var { common symbols }
-  NullSym : TItem;
-  TrueSym : TItem;
+  NullSym : TExpr;
+  TrueSym : TExpr;
 const
   whitespace  = [#0..' '];
   stopchars   = whitespace + ['(',')','[',']','{','}', '"', ''''];
@@ -119,13 +119,13 @@ function NextChar( var ch : char ) : char;
     result := ch;
   end; { NextChar( ch ) }
 
-function Item( kind : TKind; data : integer ) : TItem;
+function Sx( kind : TKind; data : integer ) : TExpr;
   begin
     result.kind := kind;
     result.data := data;
   end;
 
-function Fun( f : TPasFun ) : TItem;
+function Fun( f : TPasFun ) : TExpr;
   begin
     funs[funct] := f;
     inc(funct);
@@ -137,12 +137,12 @@ function Sym( s : string ) : cardinal;
     if not syms.Find( s, result ) then result := syms.Append( s );
   end;
 
-function Cons( head, tail : TItem ) : TItem;
+function Cons( head, tail : TExpr ) : TExpr;
   var cell : TCell;
   begin
     cell.car := head;
     cell.cdr := tail;
-    result := Item( kCEL, cels.Append( cell ));
+    result := Sx( kCEL, cels.Append( cell ));
   end;
 
 // this recognizes decimal integers.
@@ -160,13 +160,13 @@ function IsNum( s : string; out num : integer ) : boolean;
     if result and negate then num := -num;
   end;
 
-function ReadAtom : TItem;
+function ReadAtom : TExpr;
   var tok : string = ''; i : integer;
   begin
     repeat tok := tok + ch until NextChar(ch) in stopchars;
     if IsNum( tok, i )
-      then result := Item( kINT, i )
-      else result := Item( kSYM, Sym( tok ))
+      then result := Sx( kINT, i )
+      else result := Sx( kSYM, Sym( tok ))
   end;
 
 function PopChar( var s : string ) : char;
@@ -178,7 +178,7 @@ function PopChar( var s : string ) : char;
     result := ch;
   end;
 
-function ReadString : TItem;
+function ReadString : TExpr;
   var s : string = '';
   begin
     AppendStr(nest, '"');
@@ -192,7 +192,7 @@ function ReadString : TItem;
         end
       else s := s + ch;
     PopChar(nest); NextChar(ch);
-    result := Item(kSTR, Sym(s))
+    result := Sx(kSTR, Sym(s))
   end;
 
 procedure HandleDirective;
@@ -210,11 +210,11 @@ procedure SkipCommentsAndWhitespace;
         else while ch <> ascii.LF do NextChar(ch);
   end;
 
-function ReadListEnd : TItem;
+function ReadListEnd : TExpr;
   var expect : char;
   begin
     if Length(nest) = 0 then
-      result := Item(kERR, Sym('Unexpected char: ' + ch))
+      result := Sx(kERR, Sym('Unexpected char: ' + ch))
     else begin
       case PopChar(nest) of
         '{' : expect := '}';
@@ -223,17 +223,17 @@ function ReadListEnd : TItem;
         else expect := '?' // should never happen
       end;
       if ch = expect then result := NullSym
-      else result := Item(kERR, Sym('List end mismatch. Expected: '
+      else result := Sx(kERR, Sym('List end mismatch. Expected: '
                          + expect + ', got: ' + ch));
     end;
     NextChar(ch);
   end; { ReadListEnd }
 
-function ShowItem(item :TItem) : string; Forward;
-function ReadNext( out value : TItem ): TItem;
+function ShowExpr(expr :TExpr) : string; Forward;
+function ReadNext( out value : TExpr ): TExpr;
 
-  function ReadList( out res : TItem; AtHead : boolean) : TItem;
-    var car, cdr : TItem;
+  function ReadList( out res : TExpr; AtHead : boolean) : TExpr;
+    var car, cdr : TExpr;
     begin
       if AtHead then begin nest += ch; NextChar(ch) end;
       SkipCommentsAndWhitespace;
@@ -246,14 +246,14 @@ function ReadNext( out value : TItem ): TItem;
       else res := Cons(car, cdr);
       if AtHead then PopChar(nest);
       result := res;
-      // debug('List -> ' + k2s(res.kind) + ' : ' + ShowItem(res));
+      // debug('List -> ' + k2s(res.kind) + ' : ' + ShowExpr(res));
     end; { ReadList }
 
-  function ReadQuote : TItem;
+  function ReadQuote : TExpr;
     begin
       NextChar(ch);
       if ReadNext(result).kind <> kERR
-        then result := Cons(Item(kSym, Sym('quote')), result)
+        then result := Cons(Sx(kSym, Sym('quote')), result)
     end; { ReadQuote }
 
   begin
@@ -272,22 +272,22 @@ function ReadNext( out value : TItem ): TItem;
 // The evaluator applies functions that are in the car of a cell
 // to that same cell's cdr.
 
-procedure Def( strid : cardinal; item : TItem );
+procedure Def( strid : cardinal; expr : TExpr );
   var binding : TBind;
   begin
     binding.iden := strid;
-    binding.cell.car := item;
+    binding.cell.car := expr;
     defs.Append( binding );
   end;
 
-function FQuote( var item : TItem ) : TItem;
+function FQuote( var expr : TExpr ) : TExpr;
   begin
-    result := item
+    result := expr
   end;
 
-function Eval( itm : TItem ) : TItem;
+function Eval( itm : TExpr ) : TExpr;
   begin
-    result := Item(kERR, Sym('Eval Error'));
+    result := Sx(kERR, Sym('Eval Error'));
     if itm.kind = kCEL then with cels[ itm.data ] do
       begin
         if car.kind = kSTR then
@@ -299,7 +299,7 @@ function Eval( itm : TItem ) : TItem;
 
 //-- print part ------------------------------------------------
 
-function DumpCell( ref : TItem ): string;
+function DumpCell( ref : TExpr ): string;
   var cell : TCell;
   begin
     cell := cels[ ref.data ];
@@ -310,58 +310,58 @@ function DumpCell( ref : TItem ): string;
       n2s(ref.data);
   end; { DumpCell }
 
-function ShowItem( item : TItem ) : string;
+function ShowExpr( expr : TExpr ) : string;
 
-  function ShowList( ref : TItem; AtHead : boolean) : string;
+  function ShowList( ref : TExpr; AtHead : boolean) : string;
     var cell : TCell;
     begin
       // debug('ShowList:' + DumpCell(ref));
       if AtHead then result := '(' else result := ' ';
       cell := cels[ ref.data ];
-      result += ShowItem( cell.car );
+      result += ShowExpr( cell.car );
       if showFormat = fmtStruct then
-        AppendStr( result, ' . ' + ShowItem( cell.cdr ) + ')')
+        AppendStr( result, ' . ' + ShowExpr( cell.cdr ) + ')')
       else case cell.cdr.kind of
         kNUL : AppendStr( result, ')' );
         kCEL : AppendStr( result, ShowList( cell.cdr, false ));
-        else   AppendStr( result, ' . ' + ShowItem( cell.cdr ) + ')');
+        else   AppendStr( result, ' . ' + ShowExpr( cell.cdr ) + ')');
       end;
     end; { ShowList }
 
   begin
-    case item.kind of
+    case expr.kind of
       KNUL,
       kERR,
-      kSYM : result := syms[ item.data ];
-      kSTR : result := '"' + syms[ item.data ] + '"';
-      kINT : result := IntToStr( item.data );
-      kCEL : result := ShowList( item, true );
-      kFUN : result := '<' + IntToStr( item.data ) + '>';
+      kSYM : result := syms[ expr.data ];
+      kSTR : result := '"' + syms[ expr.data ] + '"';
+      kINT : result := IntToStr( expr.data );
+      kCEL : result := ShowList( expr, true );
+      kFUN : result := '<' + IntToStr( expr.data ) + '>';
     end;
     if showFormat = fmtStruct then
-      case item.kind of
+      case expr.kind of
         KNUL,
         kERR,
         kSYM,
         kSTR : result := 's:' + result;
         kINT : result := 'n:' + result;
         kFUN : result := 'f:' + result;
-        kCEL : result := ShowList( item, true );
+        kCEL : result := ShowList( expr, true );
       end;
-  end; { ShowItem }
+  end; { ShowExpr }
 
-procedure Print( item : TItem );
+procedure Print( expr : TExpr );
   begin
-    WriteLn(ShowItem(item));
+    WriteLn(ShowExpr(expr));
   end;
 
-var val : TItem;
+var val : TExpr;
 begin
   syms := TSymTbl.Create;
   cels := TCelTbl.Create;
   defs := TDefTbl.Create;
-  NullSym := Item(kNUL, Sym('()'));
-  TrueSym := Item(kSYM, Sym('T'));
+  NullSym := Sx(kNUL, Sym('()'));
+  TrueSym := Sx(kSYM, Sym('T'));
   Def(Sym('quote'), Fun(@FQuote));
   repeat Print(Eval(ReadNext(val)))
   until (val.kind = kERR)
