@@ -461,20 +461,40 @@ function MSUBLIS( x, y : TExpr ) : TExpr;
 // Following McCarthy's lead, we'll use the notation E* to
 // represents the s-expression translation of m-expression E.
 
-// e1. for any s-expression E, E* is (quote E)
-var sQUOTE : TExpr;
+// e1.QUOTE
+// e4. COND
+// e5.LAMBDA and
+// e6.LABEL
+//
+// In McCarthy's lisp, these four forms are not functions,
+// but rather 'special forms': symbols that cause the evaluator
+// to do something other than apply a function to its arguments.
 
-// q() is just a utility function for writing quotes in pascal:
+var
+  sQUOTE, sCOND, sLAMBDA, sLABEL : TExpr;
+
+// q() is just a utility function for writing quotes in pascal :
 function q(x:TExpr) : TExpr;
   begin
     result := L(sQUOTE, x)
+  end; { q }
+
+// To expose a symbolic name to the interpreter, we can create
+// symbols with Sx(kSYM, Key('name')), but it would be nicer if
+// we could simplify it to Sym('name'). So:
+function Sym( s : string ) : TExpr;
+  begin
+    result := Sx(kSYM, Key(s))
   end;
 
-// We probably don't really have a need to implement QUOTE as a
-// meta-function, but it's trivial to implement, so let's do it:
-function MQUOTE( x : TExpr ) : TExpr;
+// Once again, we'll create a procedure to initialize these
+// for us and invoke the procedure at startup.
+procedure CreateSpecials;
   begin
-    result := x
+    sQUOTE  := Sym('quote');
+    sCOND   := Sym('cond');
+    sLAMBDA := Sym('lambda');
+    sLABEL  := Sym('label');
   end;
 
 // e2. "Variables and function names that were represented by strings of
@@ -494,16 +514,6 @@ function MQUOTE( x : TExpr ) : TExpr;
 // It would be nicer to refer to functions by name, both in the
 // interpreter and in pascal code.
 //
-// To expose the name to the interpreter, we can create symbols with Sx().
-// Thus mCAR -> Sx(kSYM, Key('car')) and mSUBST -> Sx(kSYM, Key('subst')).
-//
-// We could use this syntax directly in pascal, but it would be nicer if
-// we could simplify it to Sym(s). So:
-function Sym( s : string ) : TExpr;
-  begin
-    result := Sx(kSYM, Key(s))
-  end;
-
 // For functions, though, it would be nicer still to declare a variable.
 // For clarity and to avoid name collisions, we will follow the
 // convention of prefixing variables of type TExpr and kind=kSYM with
@@ -520,15 +530,12 @@ var
   sAssoc, sSublis,
 
   // and now the ones we'll define later ...
-  sCond, sLambda, sLabel, sApply, sEval, sAppq,
+  sApply, sEval, sAppq,
   sList, sMapList, sSearch, sFilter, sReduce,
   sAdd, sSub, sMul, sDiv, sMod, sLog, sDif : TExpr;
 
   // ... for which we also have to provide forward declarations,
   // so we can refer to them when creating the kind=kMFx symbols:
-  function MCOND   ( x : TExpr ) : TExpr; forward;
-  function MLAMBDA ( x, y, z : TExpr ) : TExpr; forward;
-  function MLABEL  ( x, y : TExpr ) : TExpr; forward;
   function MAPPLY  ( f, x : TExpr ) : TExpr; forward;
   function MEVAL   ( x : TExpr ) : TExpr; forward;
   function MAPPQ   ( f, x : TExpr ) : TExpr; forward;
@@ -572,7 +579,6 @@ function Define(iden:string; value:TExpr) : TExpr;
 // still building it, we just have to do the work.)
 procedure CreateBuiltins;
   begin
-    sQuote := Define('quote', Meta(@MQUOTE));
     sAtomP := Define('atom?', Meta(@MATOMP));
     sEqP := Define('eq?', Meta(@MEQP));
     sCar := Define('car', Meta(@MCAR));
@@ -591,9 +597,6 @@ procedure CreateBuiltins;
     sZip := Define('zip', Meta(@MZIP));
     sAssoc := Define('assoc', Meta(@MASSOC));
     sSublis := Define('sublis', Meta(@MSUBLIS));
-    sCond := Define('cond', Meta(@MCOND));
-    sLambda := Define('lambda', Meta(@MLAMBDA));
-    sLabel := Define('label', Meta(@MLABEL));
     sApply := Define('apply', Meta(@MAPPLY));
     sEval := Define('eval', Meta(@MEVAL));
     sAppq := Define('appq', Meta(@MAPPQ));
@@ -675,31 +678,13 @@ function VL(vars : array of variant) : TExpr;
     result := sNULL;
     for i := high(vars) downto 0 do
       result := mCONS(Vx(vars[i]), result)
-  end;
+  end; { VL }
 
-// 4. {[p1 -> e1; ... pn -> en]}* is (COND  (p1 . e1) ... (pn . en))
-// The -> syntax is McCarthy's notation for guarded expressions.
+// e4. Cond
+// e5. Lambda
+// e6. Label
 //
-// In pascal, our meta syntax looks like:
-//
-//   if ExBool(p1) then r := e1
-//   else if ExBool(p2) then result := e2
-//   // ...
-//   else if ExBool(pn) then result := en
-//   else result := mNULL
-//
-
-function MCOND( x : TExpr ) : TExpr;
-  begin
-  end;
-
-function MLAMBDA( x, y, z : TExpr ) : TExpr;
-  begin
-  end;
-
-function MLABEL( x, y : TExpr ) : TExpr;
-  begin
-  end;
+// See note above (in e1. Quote).
 
 //-- f. universal evaluator ------------------------------------
 
@@ -1100,6 +1085,7 @@ begin
   bindfn := @mBIND;
   CreateBooleans;
   CreateBuiltins;
+  CreateSpecials;
   repeat Print(Eval(ReadNext(val)))
   until (val.kind = kERR)
 end.
