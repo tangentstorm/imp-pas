@@ -735,8 +735,8 @@ function MEVAL( e, a : TExpr ) : TExpr;
         else if mEQ(h, sCDR) then result := mCDR(mEVAL(mCADR(e),a))
         else if mEQ(h, sCONS) then result := mCONS(mEVAL(mCADR(e), a),
                                                    mEVAL(mCADDR(e), a))
-        else mEVAL(mCONS(mASSOC(mCAR(e), a),
-                         mEVLIS(mCDR(e), a)), a)
+        else result := mEVAL(mCONS(mASSOC(mCAR(e), a),
+                                   mEVLIS(mCDR(e), a)), a)
       { else h is a list }
       else if mEQ(mCAR(h), sLABEL) then
         result := mEVAL(mCONS(mCADDAR(e), mCDR(e)),
