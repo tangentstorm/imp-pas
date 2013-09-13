@@ -6,7 +6,7 @@
 //--------------------------------------------------------------
 {$mode objfpc}{$i xpc.inc}
 program imp(input, output);
-uses xpc, arrays, stacks, ascii, sysutils, strutils, num;
+uses xpc, arrays, stacks, ascii, sysutils, strutils, num, variants;
 
 procedure halt( msg : string );
   begin
@@ -624,12 +624,57 @@ procedure CreateBuiltins;
 // That's just an application of what we've already created.
 // While we're here though, we want implish to support a few things
 // that the original lisp didn't have. Most importantly: numbers,
-// strings, and arrays.
+// strings, and perhaps even arrays.
 //
-// The function C() (for 'array of const') provides a handy syntax
-// for creating these values in bulk:
-function C(cc : array of const) : TExpr;
+// The functions Vx(value) (for 'variant expression') and
+// VL([v0,v1,v2...]) provides a syntax for building TExpr
+// values from pascal variants:
+//
+// usage: Vx(3) -> Sx(kINT, 3)
+// usage: VL([3]) -> L(Sx(kINT, 3))
+//
+function VL(vars : array of variant) : TExpr;
+  forward; // because they can call each other recursively
+
+function Vx(v : variant) : TExpr; overload;
   begin
+    case VarType(v) and VarTypeMask of
+      varEmpty,
+      varNULL : result := sNULL;
+
+      varSmallInt,
+      varByte,
+      varWord,
+      varInteger : result := Sx(kINT, v);
+      // varSingle
+      // varDouble
+      // varCurrency
+      // varDate
+      // varDispatch
+      // varError
+      varBoolean : result := EnBool(v);
+      // varVariant
+      // varUnknown
+      // varLongWord
+      // varInt64
+      varOleStr, varStrArg, varString:
+        result := Sym(v);
+      // varAny: ;
+      // varTypeMask : ;
+    else result :=
+      Sx(kERR, Key(
+           '<|type:' + VarTypeAsText(VarType(v))
+           +'|:"' + VartoStr(v)
+           +'">'));
+    end
+  end;
+
+function VL(vars : array of variant) : TExpr;
+  var i: integer;
+  begin
+    result := sNULL;
+    for i := high(vars) downto 0 do
+      result := mCONS(Vx(vars[i]), result)
   end;
 
 // 4. {[p1 -> e1; ... pn -> en]}* is (COND  (p1 . e1) ... (pn . en))
