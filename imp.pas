@@ -719,7 +719,7 @@ function MEVAL( e, a : TExpr ) : TExpr;
       if mNULL(m) then result := sNULL
       else mCONS(mEVAL(mCAR(m), a),
 		 mEVLIS(mCDR(m), a))
-    end; { mEVCON }
+    end; { mEVLIS }
 
   var h : TExpr;
   begin { mEVAL }
