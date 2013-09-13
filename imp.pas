@@ -1097,6 +1097,7 @@ begin
   syms := TSymTbl.Create;
   cells := TCellTbl.Create;
   defs := TDefTbl.Create;
+  bindfn := @mBIND;
   CreateBooleans;
   CreateBuiltins;
   repeat Print(Eval(ReadNext(val)))
