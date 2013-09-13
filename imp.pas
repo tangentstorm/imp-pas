@@ -710,15 +710,14 @@ function MEVAL( e, a : TExpr ) : TExpr;
   function mEVCON( c, a : TExpr ) : TExpr;
     begin
       if exBool(mEVAL(mCAAR(c), a))
-        then mEVAL(mCADAR(c), a)
-        else mEVCON(mCDR(c), a)
+	then result := mEVAL(mCADAR(c), a)
+        else result := mEVCON(mCDR(c), a)
     end; { mEVCON }
 
   function mEVLIS( m, a : TExpr ) : TExpr;
     begin
       if mNULL(m) then result := sNULL
-      else mCONS(mEVAL(mCAR(m), a),
-		 mEVLIS(mCDR(m), a))
+      else result := mCONS(mEVAL(mCAR(m), a), mEVLIS(mCDR(m), a))
     end; { mEVLIS }
 
   var h : TExpr;
