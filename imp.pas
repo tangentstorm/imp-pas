@@ -334,6 +334,12 @@ function MCADAR( x : TExpr ) : TExpr;
     result := MCAR(MCDR(MCAR(x)))
   end;
 
+// caddar[x] -> car[cdr[cdr[car[x]]]]
+function MCADDAR( x : TExpr ) : TExpr;
+  begin
+    result := MCAR(MCDR(MCDR(mCAR(x))))
+  end;
+
 // caddr[x] -> car[cdr[cdr[x]]]
 function MCADDR( x : TExpr ) : TExpr;
   begin
@@ -536,9 +542,9 @@ var
 
   // ... for which we also have to provide forward declarations,
   // so we can refer to them when creating the kind=kMFx symbols:
-  function MAPPLY  ( f, x : TExpr ) : TExpr; forward;
-  function MEVAL   ( x : TExpr ) : TExpr; forward;
-  function MAPPQ   ( f, x : TExpr ) : TExpr; forward;
+  function MAPPLY  ( f, args : TExpr ) : TExpr; forward;
+  function MEVAL   ( e, a : TExpr ) : TExpr; forward;
+  function MAPPQ   ( m : TExpr ) : TExpr; forward;
   function MLIST   ( x : TExpr ) : TExpr; forward;
 
   function MMAPLIST ( f, x : TExpr ) : TExpr; forward;
@@ -688,9 +694,60 @@ function VL(vars : array of variant) : TExpr;
 
 //-- f. universal evaluator ------------------------------------
 
-function MAPPLY( f, x : TExpr ) : TExpr;
+function MAPPQ( m : TExpr ) : TExpr;
   begin
+    if mNULL(m) then result := sNULL
+    else result := mCONS(L(sQUOTE, mCAR(m)), mAPPQ(mCDR(m)))
   end;
+
+function MAPPLY( f, args : TExpr ) : TExpr;
+  begin
+    result := mEVAL(mCONS(f, mAPPQ(args)), sNULL)
+  end;
+
+function MEVAL( e, a : TExpr ) : TExpr;
+
+  function mEVCON( c, a : TExpr ) : TExpr;
+    begin
+      if exBool(mEVAL(mCAAR(c), a))
+        then mEVAL(mCADAR(c), a)
+        else mEVCON(mCDR(c), a)
+    end; { mEVCON }
+
+  function mEVLIS( m, a : TExpr ) : TExpr;
+    begin
+      if mNULL(m) then result := sNULL
+      else mCONS(mEVAL(mCAR(m), a),
+		 mEVLIS(mCDR(m), a))
+    end; { mEVCON }
+
+  var h : TExpr;
+  begin { mEVAL }
+    if mATOM(e) then result := mASSOC(e, a)
+    else begin
+      h := mCAR(e);
+      if mATOM(h) then
+        if mEQ(h, sQUOTE) then result := mCADR(e)
+        else if mEQ(h, sAtomP) then result := mATOMP(mEVAL(mCADR(e), a))
+        else if mEQ(h, sEQP) then result := mEQP(mEVAL(mCADR(e), a),
+                                                 mEVAL(mCADDR(e), a))
+        else if mEQ(h, sCOND) then result := mEVCON(mCDR(e), a)
+        else if mEQ(h, sCAR) then result := mCAR(mEVAL(mCADR(e),a))
+        else if mEQ(h, sCDR) then result := mCDR(mEVAL(mCADR(e),a))
+        else if mEQ(h, sCONS) then result := mCONS(mEVAL(mCADR(e), a),
+                                                   mEVAL(mCADDR(e), a))
+        else mEVAL(mCONS(mASSOC(mCAR(e), a),
+                         mEVLIS(mCDR(e), a)), a)
+      { else h is a list }
+      else if mEQ(mCAR(h), sLABEL) then
+        result := mEVAL(mCONS(mCADDAR(e), mCDR(e)),
+                        mCONS(L(mCADAR(e), mCAR(e)), a))
+      else if mEQ(mCAR(h), sLAMBDA) then
+        result := mEVAL(mCADDAR(e),
+                        mAPPEND(mZIP(mCADAR(e),
+                                     mEVLIS(mCDR(e), a)), a))
+    end;
+  end; { MEVAL }
 
 var mENV : TExpr; // todo: initialize.
 
@@ -703,13 +760,7 @@ function MBIND( iden, value : TExpr ) : TExpr;
     ---}
   end;
 
-function MEVAL( x : TExpr ) : TExpr;
-  begin
-  end;
 
-function MAPPQ( f, x : TExpr ) : TExpr;
-  begin
-  end;
 
 function MLIST ( x : TExpr ) : TExpr;
   begin
