@@ -176,48 +176,48 @@ function Meta( f : TMetaFun4 ) : TExpr; overload;
 
 // These are the elementary expressions from the 1960 LISP paper.
 //
-// The M prefix used in these routines is short for 'meta', since
+// The m prefix used in these routines is short for 'meta', since
 // we're using pascal as a meta-language to describe lisp. As a
 // convention, we will also type meta function names in ALL CAPS.
 
 // 1. atom[x] -> T if x is an atom, else F
-function MATOM( x : TExpr ) : boolean;
+function mATOM( x : TExpr ) : boolean;
   begin
     result := x.kind in atomic
-  end; { MATOM }
+  end; { mATOM }
 
 // 2. eq[x;y] = atom[x] ? atom[y] ? x = y | F | undefined
 // We'll just treat the undefined case as false.
-function MEQ( x, y : TExpr ) : boolean;
+function mEQ( x, y : TExpr ) : boolean;
   begin
-    result := MATOM(x) and MATOM(y)
+    result := mATOM(x) and mATOM(y)
       and (x.kind = y.kind)
       and (x.data = y.data)
-  end; { MEQ }
+  end; { mEQ }
 
 // 3. car[x] = atom[x] ? undefined | x0 where x = (x0, x1)
 // We'll use an error symbol for the undefined case.
-function MCAR( x : TExpr ) : TExpr;
+function mCAR( x : TExpr ) : TExpr;
   begin
-    if MATOM(x) then result := Sx(kErr, Key('!CAR[atom]'))
+    if mATOM(x) then result := Sx(kErr, Key('!CAR[atom]'))
     else result := cells[x.data].car
-  end; { MCAR }
+  end; { mCAR }
 
 // 4. cdr[x] = atom[x] ? undefined | x1 where x = (x0, x1)
-function MCDR( x : TExpr ) : TExpr;
+function mCDR( x : TExpr ) : TExpr;
   begin
-    if MATOM(x) then result := Sx(kErr, Key('!CDR[atom]'))
+    if mATOM(x) then result := Sx(kErr, Key('!CDR[atom]'))
     else result := cells[x.data].cdr
-  end; { MCdr }
+  end; { mCDR }
 
 // 5. cons[x;y] -> (x, y)
-function MCONS( x, y : TExpr ) : TExpr;
+function mCONS( x, y : TExpr ) : TExpr;
   var cell : TCell;
   begin
     cell.car := x;
     cell.cdr := y;
     result := Sx( kCEL, cells.Append( cell ));
-  end; { MCons }
+  end; { mCons }
 
 // - predicates - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -258,92 +258,92 @@ function ExBool( x : TExpr ) : boolean;
     result := x.kind <> kNUL
   end;
 
-// We can now define new versions of MATOM and MEQ as TExpr->TExpr.
+// We can now define new versions of mATOM and mEQ as TExpr->TExpr.
 // Following lisp tradiion, the P suffix is used both as an
 // abbreviation for the word 'predicate' and for its resemblence
 // to a question mark.
 
-function MATOMP( x : TExpr ) : TExpr;
+function mATOMP( x : TExpr ) : TExpr;
   begin
-    result := EnBool( MATOM( x ))
+    result := EnBool( mATOM( x ))
   end;
 
-function MEQP( x, y : TExpr ) : TExpr;
+function mEQP( x, y : TExpr ) : TExpr;
   begin
-    result := EnBool( MEQ( x, y ))
+    result := EnBool( mEQ( x, y ))
   end;
 
 //-- d. recursive meta-functions -------------------------------
 
 // 1. ff[x] -> first atomic symbol in f, ignoring parentheses.
 // Perhaps this is an abbreviation for "find first".
-function MFF( x : TExpr ) : TExpr;
+function mFF( x : TExpr ) : TExpr;
   begin
-    if MATOM(x) then result := x else result := MFF(MCAR(x))
+    if mATOM(x) then result := x else result := mFF(mCAR(x))
   end;
 
 // 2. subst[x;y;z] -> copy z, replacing each occurrence of y with x.
-function MSUBST( x, y, z : TExpr ) : TExpr;
+function mSUBST( x, y, z : TExpr ) : TExpr;
   begin
-    if MATOM(z) then
-      if MEQ(z, y) then result := x
+    if mATOM(z) then
+      if mEQ(z, y) then result := x
       else result := z
-    else result := MCONS(MSUBST(x, y, MCAR(z)),
-                         MSUBST(x, y, MCDR(z)))
+    else result := mCONS(mSUBST(x, y, mCAR(z)),
+                         mSUBST(x, y, mCDR(z)))
   end;
 
 // 3. equal[x;y] -> T if x and y are the same, else F
-function MEQUAL( x, y : TExpr ) : TExpr;
+function mEQUAL( x, y : TExpr ) : TExpr;
   begin
     result := EnBool(
-      ( MATOM(x) and MATOM(y) and MEQ(x, y) )
-      or ( not ( MATOM(x) or MATOM(y) )
-           and MEQ(MCAR(x), MCAR(y))
-           and MEQ(MCDR(x), MCDR(y)) ) )
+      ( mATOM(x) and mATOM(y) and mEQ(x, y) )
+      or ( not ( mATOM(x) or mATOM(y) )
+           and mEQ(MCAR(x), mCAR(y))
+           and mEQ(mCDR(x), mCDR(y)) ) )
   end;
 
 // 4. null?(x) -> T if x = NIL else F
-function MNULL( x : TExpr ) : boolean;
+function mNULL( x : TExpr ) : boolean;
   begin
-    result := MEQ(x, sNULL)
+    result := mEQ(x, sNULL)
   end;
 
 // here is the reified version:
-function MNULLP( x : TExpr ) : TExpr;
+function mNULLP( x : TExpr ) : TExpr;
   begin
-    result := MEQP(x, sNULL)
+    result := mEQP(x, sNULL)
   end;
 
 // - abbreviations - - - - - - - - - - - - - - - - - - - - - - -
 
 // caar[x] -> car[car[x]]
-function MCAAR( x : TExpr ) : TExpr;
+function mCAAR( x : TExpr ) : TExpr;
   begin
-    result := MCAR(MCAR(x))
+    result := mCAR(mCAR(x))
   end;
 
 // cadr[x] -> car[cdr[x]]
-function MCADR( x : TExpr ) : TExpr;
+function mCADR( x : TExpr ) : TExpr;
   begin
-    result := MCAR(MCDR(x))
+    result := mCAR(mCDR(x))
   end;
 
 // cadar[x] -> car[cdr[cdr[x]]]
-function MCADAR( x : TExpr ) : TExpr;
+function mCADAR( x : TExpr ) : TExpr;
   begin
-    result := MCAR(MCDR(MCAR(x)))
+    result := mCAR(mCDR(mCAR(x)))
   end;
 
 // caddar[x] -> car[cdr[cdr[car[x]]]]
-function MCADDAR( x : TExpr ) : TExpr;
+function mCADDAR( x : TExpr ) : TExpr;
   begin
-    result := MCAR(MCDR(MCDR(mCAR(x))))
+    result := mCAR(mCDR(mCDR(mCAR(x))))
   end;
 
 // caddr[x] -> car[cdr[cdr[x]]]
-function MCADDR( x : TExpr ) : TExpr;
+function mCADDR( x : TExpr ) : TExpr;
   begin
-    result := MCAR(MCDR(MCDR(x)))
+    result := mCAR(mCDR(mCDR(x)))
   end;
 
 // - list builder - - - - - - - - - - - - - - - - - - - - - - - -
@@ -363,91 +363,91 @@ function L : TExpr;
 
 // With one argument, L(a) returns a list with one item: a.
 function L( a : TExpr ) : TExpr;
-  begin result := MCONS(a, sNULL) end;
+  begin result := mCONS(a, sNULL) end;
 
 // After the first version, each successive version can simply
 // CONS its first argument onto the L of the other arguments.
 
-// Note that L with two arguments is *NOT* the same as MCONS.
+// Note that L with two arguments is *NOT* the same as mCONS.
 // (cons a (b c)) -> (a b c)
 // (list a (b c)) -> (a (b c))
 function L( a, b : TExpr ) : TExpr; inline;
- begin result := MCONS(a, L(b)) end;
+ begin result := mCONS(a, L(b)) end;
 
 // The rest of these just follow the same pattern:
 
 function L( a, b, c : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, L(b, c)) end;
+  begin result := mCONS(a, L(b, c)) end;
 
 function L( a, b, c, d : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, L(b, c, d)) end;
+  begin result := mCONS(a, L(b, c, d)) end;
 
 function L( a, b, c, d, e : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, L(b, c, d, e)) end;
+  begin result := mCONS(a, L(b, c, d, e)) end;
 
 function L( a, b, c, d, e, f : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, L(b, c, d, e, f)) end;
+  begin result := mCONS(a, L(b, c, d, e, f)) end;
 
 function L( a, b, c, d, e, f, g : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, L(b, c, d, e, f, g)) end;
+  begin result := mCONS(a, L(b, c, d, e, f, g)) end;
 
 function L( a, b, c, d, e, f, g, h : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, L(b, c, d, e, f, g, h)) end;
+  begin result := mCONS(a, L(b, c, d, e, f, g, h)) end;
 
 function L( a, b, c, d, e, f, g, h, i : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, L(b, c, d, e, f, g, h, i)) end;
+  begin result := mCONS(a, L(b, c, d, e, f, g, h, i)) end;
 
 function L( a, b, c, d, e, f, g, h, i, j : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, L(b, c, d, e, f, g, h, i, j)) end;
+  begin result := mCONS(a, L(b, c, d, e, f, g, h, i, j)) end;
 
 
 // - functions - - - - - - - - - - - - - - - - - - - - - - - - -
 
 // append[x;y] -> append y to x
-function MAPPEND( x, y : TExpr ) : TExpr;
+function mAPPEND( x, y : TExpr ) : TExpr;
   begin
-    if MNULL(x) then result := L(x)
-    else result := MCONS(MCAR(x), MAPPEND(MCDR(x), y))
+    if mNULL(x) then result := L(x)
+    else result := mCONS(mCAR(x), mAPPEND(mCDR(x), y))
   end;
 
 // among [x;y] = ~null[y] ^ [equal [x;car [y]] | among [x;cdr[y]]]
 // is x in list y?
-function MAMONG( x, y : TExpr ) : boolean;
+function mAMONG( x, y : TExpr ) : boolean;
   begin
-    result := MEQ(x,MCAR(y)) or MAMONG(x, MCDR(y))
+    result := mEQ(x,mCAR(y)) or mAMONG(x, mCDR(y))
   end;
 
-function MAMONGP( x, y : TExpr ) : TExpr;
+function mAMONGP( x, y : TExpr ) : TExpr;
   begin
-    result := EnBool(MAMONG(x, y))
+    result := EnBool(mAMONG(x, y))
   end;
 
 // zip -- McCarthy calls this 'pair'. 'zip' comes from haskell and python.
-function MZIP( x, y : TExpr ) : TExpr;
+function mZIP( x, y : TExpr ) : TExpr;
   begin
-    if MATOM(x) or MATOM(y) then result := sNULL
-    else result := MCONS(L(MCAR(x), MCAR(y)),
-                         MZIP(MCDR(x), MCDR(y)))
+    if mATOM(x) or mATOM(y) then result := sNULL
+    else result := mCONS(L(mCAR(x), mCAR(y)),
+                         mZIP(mCDR(x), mCDR(y)))
   end;
 
 // assoc[x;y] look up x in dictionary y
-function MASSOC( x, y : TExpr ) : TExpr;
+function mASSOC( x, y : TExpr ) : TExpr;
   begin
-    if MEQ(MCAAR(y), x) then result := MCADAR(y)
-    else result := MASSOC(x, MCDR(y))
+    if mEQ(mCAAR(y), x) then result := mCADAR(y)
+    else result := mASSOC(x, mCDR(y))
   end;
 
 // sublis[x;y] -> subst uN->vN in y, where x=((u0,v0), (u1,v1)...)
-function MSUBLIS( x, y : TExpr ) : TExpr;
+function mSUBLIS( x, y : TExpr ) : TExpr;
   function SUB2( x, z : TExpr ) : TExpr;
     begin
-      if MNULL(x) then result := z
-      else if MEQ(MCAAR(x), z) then result := MCADAR(x)
-      else result := SUB2(MCDR(x), z)
+      if mNULL(x) then result := z
+      else if mEQ(mCAAR(x), z) then result := mCADAR(x)
+      else result := SUB2(mCDR(x), z)
     end;
-  begin { MSUBLIS }
-    if MATOM(x) then result := SUB2(x, y)
-    else result := MCONS(MSUBLIS(x, MCAR(y)), MSUBLIS(x, MCDR(y)))
+  begin { mSUBLIS }
+    if mATOM(x) then result := SUB2(x, y)
+    else result := mCONS(mSUBLIS(x, mCAR(y)), mSUBLIS(x, mCDR(y)))
   end;
 
 //-- e. functions as s-expressions -----------------------------
@@ -542,24 +542,24 @@ var
 
   // ... for which we also have to provide forward declarations,
   // so we can refer to them when creating the kind=kMFx symbols:
-  function MAPPLY  ( f, args : TExpr ) : TExpr; forward;
-  function MEVAL   ( e, a : TExpr ) : TExpr; forward;
-  function MAPPQ   ( m : TExpr ) : TExpr; forward;
-  function MLIST   ( x : TExpr ) : TExpr; forward;
+  function mAPPLY  ( f, args : TExpr ) : TExpr; forward;
+  function mEVAL   ( e, a : TExpr ) : TExpr; forward;
+  function mAPPQ   ( m : TExpr ) : TExpr; forward;
+  function mLIST   ( x : TExpr ) : TExpr; forward;
 
-  function MMAPLIST ( f, x : TExpr ) : TExpr; forward;
-  function MSEARCH  ( f, x : TExpr ) : TExpr; forward;
-  function MFILTER  ( f, x : TExpr ) : TExpr; forward;
-  function MREDUCE  ( f, x, y : TExpr ) : TExpr; forward;
+  function mMAPLIST ( f, x : TExpr ) : TExpr; forward;
+  function mSEARCH  ( f, x : TExpr ) : TExpr; forward;
+  function mFILTER  ( f, x : TExpr ) : TExpr; forward;
+  function mREDUCE  ( f, x, y : TExpr ) : TExpr; forward;
 
-  function MADD ( x, y : TExpr ) : TExpr; forward;
-  function MSUB ( x, y : TExpr ) : TExpr; forward;
-  function MMUL ( x, y : TExpr ) : TExpr; forward;
-  function MDIV ( x, y : TExpr ) : TExpr; forward;
-  function MMOD ( x, y : TExpr ) : TExpr; forward;
-  function MPOW ( x, y : TExpr ) : TExpr; forward;
-  function MLOG ( x, y : TExpr ) : TExpr; forward;
-  function MDIF ( x, y : TExpr ) : TExpr; forward;
+  function mADD ( x, y : TExpr ) : TExpr; forward;
+  function mSUB ( x, y : TExpr ) : TExpr; forward;
+  function mMUL ( x, y : TExpr ) : TExpr; forward;
+  function mDIV ( x, y : TExpr ) : TExpr; forward;
+  function mMOD ( x, y : TExpr ) : TExpr; forward;
+  function mPOW ( x, y : TExpr ) : TExpr; forward;
+  function mLOG ( x, y : TExpr ) : TExpr; forward;
+  function mDIF ( x, y : TExpr ) : TExpr; forward;
 
 // We will also need a routine to bind names to their values at runtime,
 // but we'll postpone defining it until after we've defined mEVAL.
@@ -585,39 +585,39 @@ function Define(iden:string; value:TExpr) : TExpr;
 // still building it, we just have to do the work.)
 procedure CreateBuiltins;
   begin
-    sAtomP := Define('atom?', Meta(@MATOMP));
-    sEqP := Define('eq?', Meta(@MEQP));
-    sCar := Define('car', Meta(@MCAR));
-    sCdr := Define('cdr', Meta(@MCDR));
-    sCons := Define('cons', Meta(@MCONS));
-    sFF := Define('ff', Meta(@MFF));
-    sSubst := Define('subst', Meta(@MSUBST));
-    sEqualP := Define('equal', Meta(@MEQUAL));
-    sNullP := Define('null?', Meta(@MNULLP));
-    sCaar := Define('caar', Meta(@MCAAR));
-    sCadr := Define('cadr', Meta(@MCADR));
-    sCadar := Define('cadar', Meta(@MCADAR));
-    sCaddr := Define('caddr', Meta(@MCADDR));
-    sAppend := Define('append', Meta(@MAPPEND));
-    sAmongP := Define('among?', Meta(@MAMONGP));
-    sZip := Define('zip', Meta(@MZIP));
-    sAssoc := Define('assoc', Meta(@MASSOC));
-    sSublis := Define('sublis', Meta(@MSUBLIS));
-    sApply := Define('apply', Meta(@MAPPLY));
-    sEval := Define('eval', Meta(@MEVAL));
-    sAppq := Define('appq', Meta(@MAPPQ));
-    sList := Define('list', Meta(@MLIST));
-    sMapList := Define('maplist', Meta(@MMAPLIST));
-    sSearch := Define('search', Meta(@MSEARCH));
-    sFilter := Define('filter', Meta(@MFILTER));
-    sReduce := Define('reduce', Meta(@MREDUCE));
-    sAdd := Define('add', Meta(@MADD));
-    sSub := Define('sub', Meta(@MSUB));
-    sMul := Define('mul', Meta(@MMUL));
-    sDiv := Define('div', Meta(@MDIV));
-    sMod := Define('mod', Meta(@MMOD));
-    sLog := Define('log', Meta(@MLOG));
-    sDif := Define('dif', Meta(@MDIF));
+    sAtomP := Define('atom?', Meta(@mATOMP));
+    sEqP := Define('eq?', Meta(@mEQP));
+    sCar := Define('car', Meta(@mCAR));
+    sCdr := Define('cdr', Meta(@mCDR));
+    sCons := Define('cons', Meta(@mCONS));
+    sFF := Define('ff', Meta(@mFF));
+    sSubst := Define('subst', Meta(@mSUBST));
+    sEqualP := Define('equal', Meta(@mEQUAL));
+    sNullP := Define('null?', Meta(@mNULLP));
+    sCaar := Define('caar', Meta(@mCAAR));
+    sCadr := Define('cadr', Meta(@mCADR));
+    sCadar := Define('cadar', Meta(@mCADAR));
+    sCaddr := Define('caddr', Meta(@mCADDR));
+    sAppend := Define('append', Meta(@mAPPEND));
+    sAmongP := Define('among?', Meta(@mAMONGP));
+    sZip := Define('zip', Meta(@mZIP));
+    sAssoc := Define('assoc', Meta(@mASSOC));
+    sSublis := Define('sublis', Meta(@mSUBLIS));
+    sApply := Define('apply', Meta(@mAPPLY));
+    sEval := Define('eval', Meta(@mEVAL));
+    sAppq := Define('appq', Meta(@mAPPQ));
+    sList := Define('list', Meta(@mLIST));
+    sMapList := Define('maplist', Meta(@mMAPLIST));
+    sSearch := Define('search', Meta(@mSEARCH));
+    sFilter := Define('filter', Meta(@mFILTER));
+    sReduce := Define('reduce', Meta(@mREDUCE));
+    sAdd := Define('add', Meta(@mADD));
+    sSub := Define('sub', Meta(@mSUB));
+    sMul := Define('mul', Meta(@mMUL));
+    sDiv := Define('div', Meta(@mDIV));
+    sMod := Define('mod', Meta(@mMOD));
+    sLog := Define('log', Meta(@mLOG));
+    sDif := Define('dif', Meta(@mDIF));
   end;
 
 // That's it for rule 2 for meta->symbolic translation.
@@ -694,18 +694,21 @@ function VL(vars : array of variant) : TExpr;
 
 //-- f. universal evaluator ------------------------------------
 
-function MAPPQ( m : TExpr ) : TExpr;
+function mAPPQ( m : TExpr ) : TExpr;
   begin
     if mNULL(m) then result := sNULL
     else result := mCONS(L(sQUOTE, mCAR(m)), mAPPQ(mCDR(m)))
   end;
 
-function MAPPLY( f, args : TExpr ) : TExpr;
+function mAPPLY( f, args : TExpr ) : TExpr;
   begin
     result := mEVAL(mCONS(f, mAPPQ(args)), sNULL)
   end;
 
-function MEVAL( e, a : TExpr ) : TExpr;
+function ShowExpr( expr : TExpr ) : string;
+  forward; // for debugging
+
+function mEVAL( e, a : TExpr ) : TExpr;
 
   function mEVCON( c, a : TExpr ) : TExpr;
     begin
@@ -720,9 +723,18 @@ function MEVAL( e, a : TExpr ) : TExpr;
       else result := mCONS(mEVAL(mCAR(m), a), mEVLIS(mCDR(m), a))
     end; { mEVLIS }
 
+  function trace(step:string) : boolean;
+    var cmd: string;
+    begin
+      writeln('eval(', step, '):', ShowExpr(e));
+      readln(cmd); if cmd = 'q' then halt('okthxbye');
+      result := true;
+    end;
+
   var h : TExpr;
   begin { mEVAL }
-    if mATOM(e) then result := mASSOC(e, a)
+    trace('start');
+    if mATOM(e) and trace('atom!') then result := mASSOC(e, a)
     else begin
       h := mCAR(e);
       if mATOM(h) then
@@ -746,75 +758,75 @@ function MEVAL( e, a : TExpr ) : TExpr;
                         mAPPEND(mZIP(mCADAR(e),
                                      mEVLIS(mCDR(e), a)), a))
     end;
-  end; { MEVAL }
+  end; { mEVAL }
 
 var mENV : TExpr; // todo: initialize.
 
-function MBIND( iden, value : TExpr ) : TExpr;
+function mBIND( iden, value : TExpr ) : TExpr;
   begin
     {---
-    mENV := MCONS(MCONS(L(iden, value),
-                        MCAAR(mENV)),
-                  MCDR(mENV));
+    mENV := mCONS(mCONS(L(iden, value),
+                        mCAAR(mENV)),
+                  mCDR(mENV));
     ---}
   end;
 
 
 
-function MLIST ( x : TExpr ) : TExpr;
+function mLIST ( x : TExpr ) : TExpr;
   begin
   end;
 
 //-- g. higher order functions ---------------------------------
 
-function MMAPLIST( f, x : TExpr ) : TExpr;
+function mMAPLIST( f, x : TExpr ) : TExpr;
   begin
   end;
 
-function MSEARCH( f, x : TExpr ) : TExpr;
+function mSEARCH( f, x : TExpr ) : TExpr;
   begin
   end;
 
-function MFILTER( f, x : TExpr ) : TExpr;
+function mFILTER( f, x : TExpr ) : TExpr;
   begin
   end;
 
-function MREDUCE( f, x, y : TExpr ) : TExpr;
+function mREDUCE( f, x, y : TExpr ) : TExpr;
   begin
   end;
 
 
 //-- arithmetic  -----------------------------------------------
 
-function MADD( x, y : TExpr ) : TExpr;
+function mADD( x, y : TExpr ) : TExpr;
   begin
   end;
 
-function MSUB( x, y : TExpr ) : TExpr;
+function mSUB( x, y : TExpr ) : TExpr;
   begin
   end;
 
-function MMUL( x, y : TExpr ) : TExpr;
+function mMUL( x, y : TExpr ) : TExpr;
   begin
   end;
 
-function MDIV( x, y : TExpr ) : TExpr;
+function mDIV( x, y : TExpr ) : TExpr;
   begin
   end;
 
-function MMOD( x, y : TExpr ) : TExpr;
+function mMOD( x, y : TExpr ) : TExpr;
   begin
   end;
 
-function MPOW( x, y : TExpr ) : TExpr;
+function mPOW( x, y : TExpr ) : TExpr;
   begin
   end;
 
-function MLOG( x, y : TExpr ) : TExpr;
+function mLOG( x, y : TExpr ) : TExpr;
   begin
   end;
 
-function MDIF( x, y : TExpr ) : TExpr;
+function mDIF( x, y : TExpr ) : TExpr;
   begin
   end;
 
@@ -998,9 +1010,6 @@ function ReadListEnd : TExpr;
     end;
     NextChar(ch);
   end; { ReadListEnd }
-
-function ShowExpr(expr :TExpr) : string;
-  forward;
 
 function ReadNext( out value : TExpr ): TExpr;
 
