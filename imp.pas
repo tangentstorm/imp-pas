@@ -42,6 +42,7 @@ type
     kSTR,  // alternate symbol syntax with quotes to allow spaces
     kINT,  // an integer
     kCEL,  // a 'cons cell' (pair of sybols)
+    kMF0,  // a meta-procedure (a:TExpr -> (), implemented in pascal)
     kMF1,  // a meta-function (a:TExpr -> TExpr, implemented in pascal)
     kMF2,  // a meta-function (a,b:TExpr -> TExpr)
     kMF3,  // a meta-function (a,b,c:TExpr -> TExpr)
@@ -98,6 +99,7 @@ var cells : TCellTbl;
 // m-expressions to pascal functions. We will allow defining
 // variables of up to 5 arguments.
 type
+  TMetaFun0 = function : TExpr;
   TMetaFun1 = function (a : TExpr) : TExpr;
   TMetaFun2 = function (a,b : TExpr) : TExpr;
   TMetaFun3 = function (a,b,c : TExpr) : TExpr;
@@ -118,32 +120,57 @@ type
 //
 // [1] http://bugs.freepascal.org/view.php?id = 25002
 type
-  TMetaTbl = array [byte] of pointer;
+  TArity = 0..4;
+  TMetaTbl = array [byte] of record
+    case arity:TArity of
+      0 : (f0: TMetaFun0);
+      1 : (f1: TMetaFun1);
+      2 : (f2: TMetaFun2);
+      3 : (f3: TMetaFun3);
+      4 : (f4: TMetaFun4);
+    end;
+const
+  aritykind : array[TArity] of TKind = (kMF0, kMF1, kMF2, kMF3, kMF4);
 var
   metas	    : TMetaTbl;
   metacount : byte = 0;
 
 // Meta adds a function record to the 'metas' table and constructs
 // a unique symbol for it.
-function NextMeta( k : TKind; p : pointer ) : TExpr;
+function NextMeta( a : TArity; p : pointer ) : TExpr;
   begin
-    metas[metacount] := p;
+    with metas[metacount] do
+      begin
+        arity := a;
+        case arity of
+          0: f0 := TMetaFun0(p);
+          1: f1 := TMetaFun1(p);
+          2: f2 := TMetaFun2(p);
+          3: f3 := TMetaFun3(p);
+          4: f4 := TMetaFun4(p);
+        end
+      end;
     if metacount > high(metas) then halt( 'out of meta slots.' );
-    result := Sx(k, metacount);
+    result := Sx(aritykind[a], metacount);
     inc(metacount);
   end;
 
+function Meta( f : TMetaFun0 ) : TExpr; overload;
+  begin NextMeta(0, @f) end;
+
 function Meta( f : TMetaFun1 ) : TExpr; overload;
-  begin NextMeta(kMF1, @f) end;
+  begin NextMeta(1, @f) end;
 
 function Meta( f : TMetaFun2 ) : TExpr; overload;
-  begin NextMeta(kMF2, @f) end;
+  begin NextMeta(2, @f) end;
 
 function Meta( f : TMetaFun3 ) : TExpr; overload;
-  begin NextMeta(kMF3, @f) end;
+  begin NextMeta(3, @f) end;
 
 function Meta( f : TMetaFun4 ) : TExpr; overload;
-  begin NextMeta(kMF4, @f) end;
+  begin NextMeta(4, @f) end;
+
+// We will populate this table in section e2.
 
 //-- c. elementary meta-expressions ----------------------------
 
@@ -314,51 +341,66 @@ function MCADDR( x : TExpr ) : TExpr;
   end;
 
 // - list builder - - - - - - - - - - - - - - - - - - - - - - - -
-// We'll define MLIST for up to 10 items, as a convenience for
-// people writing meta-extensions in pascal.
 
-function MLIST( a : TExpr ) : TExpr;
+// The function L will build lists as s-sexpressions. This
+// corresponds to McCarthy's suggested LIST function, but because
+// it's only a convenience method for use in pascal, we will not try
+// to lift it into implish. (We will have to wait to implement
+// the normal lisp LIST routine until after we implement EVAL).
+
+// So: we'll define L for up to 10 items, purely for our own
+// convenience.
+
+// With zero arguments, L() returns the empty list:
+function L : TExpr;
+  begin result := sNULL end;
+
+// With one argument, L(a) returns a list with one item: a.
+function L( a : TExpr ) : TExpr;
   begin result := MCONS(a, sNULL) end;
 
 // After the first version, each successive version can simply
-// CONS its first argument onto the MLIST of the other arguments.
+// CONS its first argument onto the L of the other arguments.
 
-// Note that MLIST with two arguments is *NOT* the same as MCONS.
+// Note that L with two arguments is *NOT* the same as MCONS.
 // (cons a (b c)) -> (a b c)
 // (list a (b c)) -> (a (b c))
-function MLIST( a, b : TExpr ) : TExpr; inline;
- begin result := MCONS(a, MLIST(b)) end;
+function L( a, b : TExpr ) : TExpr; inline;
+ begin result := MCONS(a, L(b)) end;
 
-function MLIST( a, b, c : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, MLIST(b, c)) end;
+// The rest of these just follow the same pattern:
 
-function MLIST( a, b, c, d : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, MLIST(b, c, d)) end;
+function L( a, b, c : TExpr ) : TExpr; inline;
+  begin result := MCONS(a, L(b, c)) end;
 
-function MLIST( a, b, c, d, e : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, MLIST(b, c, d, e)) end;
+function L( a, b, c, d : TExpr ) : TExpr; inline;
+  begin result := MCONS(a, L(b, c, d)) end;
 
-function MLIST( a, b, c, d, e, f : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, MLIST(b, c, d, e, f)) end;
+function L( a, b, c, d, e : TExpr ) : TExpr; inline;
+  begin result := MCONS(a, L(b, c, d, e)) end;
 
-function MLIST( a, b, c, d, e, f, g : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, MLIST(b, c, d, e, f, g)) end;
+function L( a, b, c, d, e, f : TExpr ) : TExpr; inline;
+  begin result := MCONS(a, L(b, c, d, e, f)) end;
 
-function MLIST( a, b, c, d, e, f, g, h : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, MLIST(b, c, d, e, f, g, h)) end;
+function L( a, b, c, d, e, f, g : TExpr ) : TExpr; inline;
+  begin result := MCONS(a, L(b, c, d, e, f, g)) end;
 
-function MLIST( a, b, c, d, e, f, g, h, i : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, MLIST(b, c, d, e, f, g, h, i)) end;
+function L( a, b, c, d, e, f, g, h : TExpr ) : TExpr; inline;
+  begin result := MCONS(a, L(b, c, d, e, f, g, h)) end;
 
-function MLIST( a, b, c, d, e, f, g, h, i, j : TExpr ) : TExpr; inline;
-  begin result := MCONS(a, MLIST(b, c, d, e, f, g, h, i, j)) end;
+function L( a, b, c, d, e, f, g, h, i : TExpr ) : TExpr; inline;
+  begin result := MCONS(a, L(b, c, d, e, f, g, h, i)) end;
+
+function L( a, b, c, d, e, f, g, h, i, j : TExpr ) : TExpr; inline;
+  begin result := MCONS(a, L(b, c, d, e, f, g, h, i, j)) end;
+
 
 // - functions - - - - - - - - - - - - - - - - - - - - - - - - -
 
 // append[x;y] -> append y to x
 function MAPPEND( x, y : TExpr ) : TExpr;
   begin
-    if MNULL(x) then result := MLIST(x)
+    if MNULL(x) then result := L(x)
     else result := MCONS(MCAR(x), MAPPEND(MCDR(x), y))
   end;
 
@@ -378,7 +420,7 @@ function MAMONGP( x, y : TExpr ) : TExpr;
 function MZIP( x, y : TExpr ) : TExpr;
   begin
     if MATOM(x) or MATOM(y) then result := sNULL
-    else result := MCONS(MLIST(MCAR(x), MCAR(y)),
+    else result := MCONS(L(MCAR(x), MCAR(y)),
                          MZIP(MCDR(x), MCDR(y)))
   end;
 
@@ -409,30 +451,88 @@ function MSUBLIS( x, y : TExpr ) : TExpr;
 
 // In pascal, our meta-language consitsts of the Sx()
 // function, our various meta-functions, and the variables
-// sTRUE and sNULL. We can even refer to our pascal functions
-// as symbols by adding them to the 'metas' array and creating
-// a new TExpr where kind=kMET.
-//
-// We will go ahead and create variables now for all of the routines
-// of type (TExpr -> TExpr) that we've defined so far, as well as
-// the ones we're about to define below.
-var
-  sAtomP, sEqP, sCar, sCdr, sCons, sFF, sSubst, sEqualP, sNullP,
-  sCaar, sCadr, sCadar, sCaddr, sList, sAppend, sAmongP, sZip,
-  sAssoc, sSublis : TExpr;
+// sTRUE and sNULL.
 
-// and the new ones...
+// To translate our meta-notation to the symbolic notation, we
+// will can create a symbol where kind=kMF** for each function,
+// and add it to the 'metas' array we created earlier.
+
+// Let's consider each of his translation rules, in order.
+// Following McCarthy's lead, we'll use the notation E* to
+// represents the s-expression translation of m-expression E.
+
+// e1. for any s-expression E, E* is (quote E)
+var sQUOTE : TExpr;
+
+// q() is just a utility function for writing quotes in pascal:
+function q(x:TExpr) : TExpr;
+  begin
+    result := L(sQUOTE, x)
+  end;
+
+// We probably don't really have a need to implement QUOTE as a
+// meta-function, but it's trivial to implement, so let's do it:
+function MQUOTE( x : TExpr ) : TExpr;
+  begin
+    result := x
+  end;
+
+// e2. "Variables and function names that were represented by strings of
+// lower-case letters are translated to the corresponding strings of the
+// corresponding uppercase letters. Thus car* is CAR and subst* is SUBST."
+//
+// In pascal, we can use the @ operator ('address-of') to refer to a
+// function or procedure without actually calling it. Thus, to refer
+// to the mCAR function, we could write @mCAR.
+//
+// Earlier, we defined Meta(), which allows us to create a symbol
+// (with .kind in [kMF0..kMF4]) for any of our meta-functions.
+// However, these values don't have a very user-friendly symbolic
+// representation. (In the interpreter, we just render them as:
+// <0>, <1> .. <n> for the record stored in metas[n])
+//
+// It would be nicer to refer to functions by name, both in the
+// interpreter and in pascal code.
+//
+// To expose the name to the interpreter, we can create symbols with Sx().
+// Thus mCAR -> Sx(kSYM, Key('car')) and mSUBST -> Sx(kSYM, Key('subst')).
+//
+// We could use this syntax directly in pascal, but it would be nicer if
+// we could simplify it to Sym(s). So:
+function Sym( s : string ) : TExpr;
+  begin
+    result := Sx(kSYM, Key(s))
+  end;
+
+// For functions, though, it would be nicer still to declare a variable.
+// For clarity and to avoid name collisions, we will follow the
+// convention of prefixing variables of type TExpr and kind=kSYM with
+// the prefix 's'. (We've already been doing this with sTRUE and sNULL.)
+// Then we can refer to mCAR symbolically as sCar, mSUBST as sSubst, etc.
+//
+// We will create such a symbol now for all of the routines
+// of type (TExpr -> TExpr) that we've defined so far, as well as
+// the ones we're going to define later in the file.
+var
+  // the functions we've defined so far:
+  sAtomP, sEqP, sCar, sCdr, sCons, sFF, sSubst, sEqualP, sNullP,
+  sCaar, sCadr, sCadar, sCaddr, sAppend, sAmongP, sZip,
+  sAssoc, sSublis,
+
+  // and now the ones we'll define later ...
   sCond, sLambda, sLabel, sApply, sEval, sAppq,
-  sMapList, sSearch, sFilter, sReduce,
+  sList, sMapList, sSearch, sFilter, sReduce,
   sAdd, sSub, sMul, sDiv, sMod, sLog, sDif : TExpr;
 
-// ... for which we also have to provide forward declarations:
-  function MCOND    ( x : TExpr ) : TExpr; forward;
-  function MLAMBDA  ( x, y, z : TExpr ) : TExpr; forward;
-  function MLABEL   ( x, y : TExpr ) : TExpr; forward;
-  function MAPPLY   ( f, x : TExpr ) : TExpr; forward;
-  function MEVAL    ( x : TExpr ) : TExpr; forward;
-  function MAPPQ    ( f, x : TExpr ) : TExpr; forward;
+  // ... for which we also have to provide forward declarations,
+  // so we can refer to them when creating the kind=kMFx symbols:
+  function MCOND   ( x : TExpr ) : TExpr; forward;
+  function MLAMBDA ( x, y, z : TExpr ) : TExpr; forward;
+  function MLABEL  ( x, y : TExpr ) : TExpr; forward;
+  function MAPPLY  ( f, x : TExpr ) : TExpr; forward;
+  function MEVAL   ( x : TExpr ) : TExpr; forward;
+  function MAPPQ   ( f, x : TExpr ) : TExpr; forward;
+  function MLIST   ( x : TExpr ) : TExpr; forward;
 
   function MMAPLIST ( f, x : TExpr ) : TExpr; forward;
   function MSEARCH  ( f, x : TExpr ) : TExpr; forward;
@@ -448,26 +548,31 @@ var
   function MLOG ( x, y : TExpr ) : TExpr; forward;
   function MDIF ( x, y : TExpr ) : TExpr; forward;
 
-// Finally, we will define one more TExpr variable, to hold
-// the current environment (the list of variable bindings).
-// It's format will be (((n0 . v1) (n1 . v1)...) ...)
-// where the outermost list contains a stack of scopes,
-// and each inner list contains name-value pairs. The
-// CAR of mENV will be the innermost scope.
-var mENV : TExpr;
+// We will also need a routine to bind names to their values at runtime,
+// but we'll postpone defining it until after we've defined mEVAL.
+// Also, we will want to experiment with various representations for
+// storing variable names and their bindings. Therefore, instead of
+// simply declaring this as a 'forward' function, we'll create a
+// global function variable:
+var bindFn : TMetaFun2; // (identifier, value)->identifier
 
-function Define(n:string; x:TExpr) : TExpr;
+// Now we can define a function to create a symbol from a pascal
+// string and bind it to a value.
+function Define(iden:string; value:TExpr) : TExpr;
   begin
-    result := Sx(kSYM, Key(n)); // symbol representing the name
-    // env: (((x . y) ...) ...) -> (((n . f) (x . y) ...) ...)
-    mENV := MCONS(
-      MCONS(MLIST(result, x),
-            MCAAR(mENV)),
-      MCDR(mENV));
+    result := bindFn(Sym(iden), value)
   end;
 
+// It would be nice if we could also pass in the function pointer
+// above, but that would require duplicating the type-system
+// shenannigans we already went through when we defined Meta().
+// So... The following function is a bit long and tedious, but
+// also very simple. (This is exactly the sort of place where a
+// meta-programming system would come in handy. But since we're
+// still building it, we just have to do the work.)
 procedure CreateBuiltins;
   begin
+    sQuote := Define('quote', Meta(@MQUOTE));
     sAtomP := Define('atom?', Meta(@MATOMP));
     sEqP := Define('eq?', Meta(@MEQP));
     sCar := Define('car', Meta(@MCAR));
@@ -481,7 +586,6 @@ procedure CreateBuiltins;
     sCadr := Define('cadr', Meta(@MCADR));
     sCadar := Define('cadar', Meta(@MCADAR));
     sCaddr := Define('caddr', Meta(@MCADDR));
-    sList := Define('list', Meta(@MLIST));
     sAppend := Define('append', Meta(@MAPPEND));
     sAmongP := Define('among?', Meta(@MAMONGP));
     sZip := Define('zip', Meta(@MZIP));
@@ -493,6 +597,7 @@ procedure CreateBuiltins;
     sApply := Define('apply', Meta(@MAPPLY));
     sEval := Define('eval', Meta(@MEVAL));
     sAppq := Define('appq', Meta(@MAPPQ));
+    sList := Define('list', Meta(@MLIST));
     sMapList := Define('maplist', Meta(@MMAPLIST));
     sSearch := Define('search', Meta(@MSEARCH));
     sFilter := Define('filter', Meta(@MFILTER));
@@ -506,16 +611,38 @@ procedure CreateBuiltins;
     sDif := Define('dif', Meta(@MDIF));
   end;
 
-// Now let's consider each of his translation rules, in order.
-// Following McCarthy's lead, we'll use the notation E* to
-// represents the s-expression translation of m-expression E.
+// That's it for rule 2 for meta->symbolic translation.
+// The others won't require nearly as much work.
 
-// 1. for any s-expression E, E* is (quote E)
-var sQUOTE : TExpr;
-function Q(item:TExpr) : TExpr;
+
+// 3. A form  f[e1; ...; en*] is translated to  (f*, e1* ... en*).
+// Thus cons [car [x]; cdr [x]]* is (CONS (CAR X) (CDR X)).
+//
+// For us, we map from functions to lists, so our translation is:
+// mCONS(mCAR(x), mCDR(x)) -> L(sCons, L(sCar, x), L(sCdr, x));
+//
+// That's just an application of what we've already created.
+// While we're here though, we want implish to support a few things
+// that the original lisp didn't have. Most importantly: numbers,
+// strings, and arrays.
+//
+// The function C() (for 'array of const') provides a handy syntax
+// for creating these values in bulk:
+function C(cc : array of const) : TExpr;
   begin
-    result := MLIST(sQUOTE)
   end;
+
+// 4. {[p1 -> e1; ... pn -> en]}* is (COND  (p1 . e1) ... (pn . en))
+// The -> syntax is McCarthy's notation for guarded expressions.
+//
+// In pascal, our meta syntax looks like:
+//
+//   if ExBool(p1) then r := e1
+//   else if ExBool(p2) then result := e2
+//   // ...
+//   else if ExBool(pn) then result := en
+//   else result := mNULL
+//
 
 function MCOND( x : TExpr ) : TExpr;
   begin
@@ -535,11 +662,26 @@ function MAPPLY( f, x : TExpr ) : TExpr;
   begin
   end;
 
+var mENV : TExpr; // todo: initialize.
+
+function MBIND( iden, value : TExpr ) : TExpr;
+  begin
+    {---
+    mENV := MCONS(MCONS(L(iden, value),
+                        MCAAR(mENV)),
+                  MCDR(mENV));
+    ---}
+  end;
+
 function MEVAL( x : TExpr ) : TExpr;
   begin
   end;
 
 function MAPPQ( f, x : TExpr ) : TExpr;
+  begin
+  end;
+
+function MLIST ( x : TExpr ) : TExpr;
   begin
   end;
 
