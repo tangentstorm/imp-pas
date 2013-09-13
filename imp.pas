@@ -1059,14 +1059,7 @@ function FQuote( var expr : TExpr ) : TExpr;
 
 function Eval( itm : TExpr ) : TExpr;
   begin
-    result := Sx(kERR, Key('Eval Error'));
-    if itm.kind = kCEL then with cells[ itm.data ] do
-      begin
-        if car.kind = kSTR then
-          if syms[car.data] = 'quote' then
-            result := FQuote(cdr)
-      end
-    else result := itm;
+    result := mEVAL(itm, sNULL)
   end;
 
 //== print part ================================================
