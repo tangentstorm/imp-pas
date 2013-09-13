@@ -85,7 +85,7 @@ function Key( s :  string ) : cardinal;
 type
   TCell = record
             car, cdr : TExpr
-	  end;
+          end;
 
 // 'cells' is the the global table of cells.
 type TCellTbl = specialize arrays.GArray<TCell>;
@@ -132,7 +132,7 @@ type
 const
   aritykind : array[TArity] of TKind = (kMF0, kMF1, kMF2, kMF3, kMF4);
 var
-  metas	    : TMetaTbl;
+  metas     : TMetaTbl;
   metacount : byte = 0;
 
 // Meta adds a function record to the 'metas' table and constructs
@@ -783,13 +783,12 @@ function MDIF( x, y : TExpr ) : TExpr;
   begin
   end;
 
-
 // - functions - - - - - - - - - - - - - - - - - - - - - - - - -
 type
   TBind = record // name bindings.
-            iden : integer; // index of a string
-            cell : TCell;   // car=value cdr=attributes
-          end;
+    iden : integer; // index of a string
+    cell : TCell;   // car=value cdr=attributes
+  end;
   TDefTbl = specialize arrays.GArray<TBind>;
 
 var
@@ -960,12 +959,14 @@ function ReadListEnd : TExpr;
       end;
       if ch = expect then result := sNULL
       else result := Sx(kERR, Key('List end mismatch. Expected: '
-                         + expect + ', got: ' + ch));
+                                  + expect + ', got: ' + ch));
     end;
     NextChar(ch);
   end; { ReadListEnd }
 
-function ShowExpr(expr :TExpr) : string; Forward;
+function ShowExpr(expr :TExpr) : string;
+  forward;
+
 function ReadNext( out value : TExpr ): TExpr;
 
   function ReadList( out res : TExpr; AtHead : boolean) : TExpr;
@@ -989,7 +990,7 @@ function ReadNext( out value : TExpr ): TExpr;
     begin
       NextChar(ch);
       if ReadNext(result).kind <> kERR
-        then result := MCons(Sx(kSym, Key('quote')), result)
+      then result := MCons(Sx(kSym, Key('quote')), result)
     end; { ReadQuote }
 
   begin
