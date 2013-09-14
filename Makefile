@@ -1,6 +1,6 @@
 XPL = lib/xpl/code
 GEN = gen
-FPC = fpc -gl -B -Sgic -Fu$(XPL) -Fi$(XPL) -FE$(GEN)
+FPC = fpc -gl -B -Sgic -Fu$(XPL) -Fi$(GEN) -Fi$(XPL) -FE$(GEN)
 
 targets:
 	@echo 'available targets:'
@@ -9,6 +9,7 @@ targets:
 	@echo 'make run     -> build and run ./gen/imp'
 	@echo 'make raw     -> build ./gen/impraw (no prompt version)'
 	@echo 'make test    -> build and test ./gen/impraw'
+	@echo 'make unit    -> build and run unit tests'
 
 imp: init imp.pas
 	$(FPC) -dIMPSHELL imp.pas -oimp
@@ -20,11 +21,14 @@ raw: imp.pas
 	$(FPC) -dIMPSHELL -dNOPROMPT -vn imp.pas -oimpraw
 
 run-tests.pas:
-	ln -s $(XPL)/../test/run-tests.pas
+	ln -F -s $(XPL)/../test/run-tests.pas
 
-imptest: run-tests.pas imp
-	@python $(XPL)/../test/gen-tests.py $(GEN)
-	$(FPC) -vn imptest.pas
+$(GEN)/imp.def: imp.pas
+	python tools/impdefs.py  > imp.def
+
+unit: $(GEN)/imp.def imp run-tests.pas
+	@cd test; python ../$(XPL)/../test/gen-tests.py ../$(GEN)
+	$(FPC) -Mobjfpc -vn run-tests.pas -Fu./test -oimptest
 	$(GEN)/imptest
 
 test: raw

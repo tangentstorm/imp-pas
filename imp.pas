@@ -760,7 +760,6 @@ function mEVAL( e, a : TExpr ) : TExpr;
   var
     h{head}, r{result} : TExpr;
   begin { mEVAL }
-    trace('eval', e);
     if mATOM(e) then r := mASSOC(e, a)
     else if mATOM(mCAR(e)) then
       begin

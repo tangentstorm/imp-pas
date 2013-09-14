@@ -6,6 +6,7 @@ gen/
 *.gpi
 *.bak
 *.pyc
+run-tests.pas
 
 fp___.err
 fp___.out
