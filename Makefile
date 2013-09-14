@@ -5,25 +5,25 @@ FPC = fpc -gl -B -Sgic -Fu$(XPL) -Fi$(XPL) -FE$(GEN)
 targets:
 	@echo 'available targets:'
 	@echo '--------------------------'
-	@echo 'make imp     -> build ./gen/imp'
+	@echo 'make imp     -> build implish.pas as ./gen/imp'
 	@echo 'make run     -> build and run ./gen/imp'
-	@echo 'make imp     -> build ./gen/impraw (no prompt version)'
+	@echo 'make raw     -> build ./gen/impraw (no prompt version)'
 	@echo 'make test    -> build and test ./gen/impraw'
 
-imp: init
-	$(FPC) imp.pas
+imp: init imp.pas implish.pas
+	$(FPC) implish.pas -oimp
 
 run: imp
 	$(GEN)/imp
 
-impraw:
-	$(FPC) -dNOPROMPT -vn imp.pas -oimpraw
+raw:
+	$(FPC) -dNOPROMPT -vn implish.pas -oimpraw
 
 imptest:
-	$(FPC) -dIMPTEST -vn imp.pas -oimptest
+	$(FPC) -vn imptest.pas
 	$(GEN)/imptest
 
-test: impraw
+test: raw
 	test/orgtest.py $(GEN)/impraw test/lisptests.org
 
 roots: impraw

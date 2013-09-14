@@ -5,8 +5,14 @@
 // Avaliable to the public for use under the MIT/X11 License.
 //--------------------------------------------------------------
 {$mode objfpc}{$i xpc.inc}
-program imp(input, output);
+unit imp; interface
 uses xpc, arrays, stacks, ascii, sysutils, strutils, num, variants;
+
+procedure Shell;
+
+////////////////////////////////////////////////////////////////
+implementation ////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 procedure halt( msg : string );
   begin
@@ -1142,9 +1148,13 @@ procedure Print( expr : TExpr );
     WriteLn(ShowExpr(expr));
   end;
 
-{$IFDEF IMPTEST}{$I imptest.pas}{$ENDIF}
+procedure Shell;
+  var val : TExpr;
+  begin
+    repeat Print(Eval(ReadNext(val)))
+    until (val.kind = kERR)
+  end;
 
-var val : TExpr;
 begin
   syms := TSymTbl.Create;
   cells := TCellTbl.Create;
@@ -1153,7 +1163,4 @@ begin
   CreateBooleans;
   CreateBuiltins;
   CreateSpecials;
-  {$IFDEF IMPTEST}RunTests; System.Halt;{$ENDIF}
-  repeat Print(Eval(ReadNext(val)))
-  until (val.kind = kERR)
 end.
