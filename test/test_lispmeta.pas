@@ -20,6 +20,7 @@ procedure test_vxvl;
     cx('(1 2)', VL([1,2]));
     cx('(a b c 1 2 3)', VL(['a','b','c',1,2,3]));
     cx('(x y)', mCONS(x, mCONS( y, sNULL )));
+    cx('(cons a b)', L(sCons, a, b));
   end;
 
 procedure test_atomP;
@@ -70,7 +71,7 @@ procedure test_env;
 // check eval
 procedure cev(s : string; x:TExpr);
   begin
-    cx(s, mEVAL(x, env))
+    cx(s, mEVAL(x, mAPPEND(env, mENV)))
   end;
 
 procedure test_eval_atom;

@@ -100,6 +100,11 @@ function Sym( s : string ) : TExpr;
     result := Sx(kSYM, Key(s))
   end;
 
+function Err( s : string ) : TExpr;
+  begin
+    result := Sx(kERR, Key(s))
+  end;
+
 // - cells - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // An S-expression where kind=kCEL is a cell. Cells are simply
 // pairs of s-expressions. For historical reasons, these are
@@ -181,19 +186,19 @@ function NextMeta( a : TArity; p : pointer ) : TExpr;
   end;
 
 function Meta( f : TMetaFun0 ) : TExpr; overload;
-  begin NextMeta(0, @f) end;
+  begin NextMeta(0, f) end;
 
 function Meta( f : TMetaFun1 ) : TExpr; overload;
-  begin NextMeta(1, @f) end;
+  begin NextMeta(1, f) end;
 
 function Meta( f : TMetaFun2 ) : TExpr; overload;
-  begin NextMeta(2, @f) end;
+  begin NextMeta(2, f) end;
 
 function Meta( f : TMetaFun3 ) : TExpr; overload;
-  begin NextMeta(3, @f) end;
+  begin NextMeta(3, f) end;
 
 function Meta( f : TMetaFun4 ) : TExpr; overload;
-  begin NextMeta(4, @f) end;
+  begin NextMeta(4, f) end;
 
 // We will populate this table in section e2.
 
@@ -470,7 +475,7 @@ function mZIP( x, y : TExpr ) : TExpr;
 // assoc[s;a] look up symbol s in alist a where a = ((k0,v0) (k1,v1) ...)
 function mASSOC( s, a : TExpr ) : TExpr;
   begin
-    if mNULL(a) then result := sNULL
+    if mNULL(a) then result := Err('!ASSOC[' + ShowExpr(s) + ']')
     else if mEQ(mCAAR(a), s) then result := mCADAR(a)
     else result := mASSOC(s, mCDR(a))
   end;
@@ -515,7 +520,7 @@ function mSUBLIS( x, y : TExpr ) : TExpr;
 // to do something other than apply a function to its arguments.
 
 var
-  sQUOTE, sCOND, sLAMBDA, sLABEL : TExpr;
+  sQUOTE, sCOND, sLAMBDA, sLABEL, sENV, sDEF : TExpr;
 
 // q() is just a utility function for writing quotes in pascal :
 function q(x:TExpr) : TExpr;
@@ -531,6 +536,8 @@ procedure CreateSpecials;
     sCOND   := Sym('cond');
     sLAMBDA := Sym('lambda');
     sLABEL  := Sym('label');
+    sENV    := Sym('env');
+    sDEF    := Sym('def');
   end;
 
 // e2. "Variables and function names that were represented by strings of
@@ -758,14 +765,20 @@ function mEVAL( e, a : TExpr ) : TExpr;
     end; { mEVLIS }
 
   var
-    h{head}, r{result} : TExpr;
+    h{head}, r{result}, x : TExpr;
   begin { mEVAL }
-    if mATOM(e) then r := mASSOC(e, a)
+    if mATOM(e) then
+      if e.kind = kSYM then r := mASSOC(e, a)
+      else r := e
     else if mATOM(mCAR(e)) then
       begin
         h := mCAR(e);
         { eval[(QUOTE X), a] -> X # 1 argument only }
         if mEQ(h, sQUOTE) then r := mCADR(e)
+
+        else if mEQ(h, sENV) then r := a
+        else if mEQ(h, sDEF) then r := bindFn(mCADR(e), mCADDR(e))
+
         { eval[(ATOM? X), a] -> atom?[eval[X]] }
         else if mEQ(h, sATOMP) then r := mATOMP(mEVAL(mCADR(e), a))
         { eval[(EQ? X Y), a] -> eq?[eval[X,a] eval[Y,a]] }
@@ -781,8 +794,18 @@ function mEVAL( e, a : TExpr ) : TExpr;
         else if mEQ(h, sCONS) then r := mCONS(mEVAL(mCADR(e), a),
                                               mEVAL(mCADDR(e), a))
         { eval[h|t, a] -> eval[cons[eval[h,a], evlis[t, a]], a] }
-        else r := mEVAL(mCONS(mASSOC(mCAR(e), a),
-                              mEVLIS(mCDR(e), a)), a)
+        else begin
+          x := mASSOC(h, a);
+          case x.kind of
+	    kMF0 : r := metas[x.data].f0();
+	    kMF1 : r := metas[x.data].f1(mCADR(e));
+	    kMF2 : r := metas[x.data].f2(mCADR(e), mCADDR(e));
+//	    kMF3 : r := metas[x.data].f3(mCADR(e), mCADDR(e), mCADDDR);
+//	    kMF4 : r := metas[x.data]
+//			.f4(mCADR(e), mCADDR(e), mCADDDR, mCADDDDR);
+            else r := mEVAL(mCONS(x, mEVLIS(mCDR(e), a)), a)
+          end
+        end
       end
     { eval[((LABEL X Y) Z), a] -> eval[cons[Y Z], cons[(X Y), a]] }
     else if mEQ(mCAAR(e), sLABEL) then
@@ -796,13 +819,13 @@ function mEVAL( e, a : TExpr ) : TExpr;
     result := r
   end; { mEVAL }
 
+{$IFDEF IMPSHELL}
+var mENV : TExpr; // initial environment
+{$ENDIF}
 function mBIND( iden, value : TExpr ) : TExpr;
   begin
-    {---
-    mENV := mCONS(mCONS(L(iden, value),
-                        mCAAR(mENV)),
-                  mCDR(mENV));
-    ---}
+    mENV := mCONS(L(iden, value), mENV); // flat list of pairs for now
+    result := iden;
   end;
 
 function mLIST ( x : TExpr ) : TExpr;
@@ -832,6 +855,8 @@ function mREDUCE( f, x, y : TExpr ) : TExpr;
 
 function mADD( x, y : TExpr ) : TExpr;
   begin
+    if (x.kind <> kINT) or (x.kind <> kINT) then result := Err('NaN')
+    else result := Sx(kINT, x.data + y.data)
   end;
 
 function mSUB( x, y : TExpr ) : TExpr;
@@ -1098,7 +1123,6 @@ function FQuote( var expr : TExpr ) : TExpr;
     result := expr
   end;
 
-var mENV : TExpr; // initial environment
 function Eval( itm : TExpr ) : TExpr;
   begin
     result := mEVAL(itm, mENV)
@@ -1173,11 +1197,12 @@ begin
   syms := TSymTbl.Create;
   cells := TCellTbl.Create;
   defs := TDefTbl.Create;
-  bindfn := @mBIND;
+  bindFn := @mBIND;
   CreateBooleans;
+  mENV := L(L(sTRUE, sTRUE)); // bind #t to itself
   CreateBuiltins;
   CreateSpecials;
-  mENV := L(L(sTRUE, sTRUE)); // bind #t to itself
+  WriteLn(ShowExpr(mENV));
 { }{$IFDEF IMPSHELL}
   Shell;
 { }{$ENDIF}
