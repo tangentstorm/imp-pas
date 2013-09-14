@@ -1,18 +1,21 @@
-//--------------------------------------------------------------
+//////////////////////////////////////////////////////////////
 // implish: an imperative meta-programming language.
 //
 // Copyright 2013 Michal J Wallace <http://tangentstorm.com/>
 // Avaliable to the public for use under the MIT/X11 License.
 //--------------------------------------------------------------
-{$mode objfpc}{$i xpc.inc}
-unit imp; interface
-uses xpc, arrays, stacks, ascii, sysutils, strutils, num, variants;
-
-procedure Shell;
-
-////////////////////////////////////////////////////////////////
-implementation ////////////////////////////////////////////////
+// This unit can be compiled as a program by defining the symbol
+// symbol IMPSHELL during compilation. The Makefile generates
+// an interface section automatically.
 //////////////////////////////////////////////////////////////
+{$mode objfpc}{$i xpc.inc}
+{ }{$IFNDEF IMPSHELL} // { } so the pre-processor won't see it
+unit imp;
+interface {$I imp.def} implementation
+{ }{$ELSE}
+program imp;
+{ }{$ENDIF}
+uses xpc, arrays, stacks, ascii, sysutils, strutils, num, variants;
 
 procedure halt( msg : string );
   begin
@@ -40,6 +43,7 @@ procedure halt( msg : string );
 // When x.kind=kINT, x.data represents the integer itself. In all
 // other cases, the data field is either ignored or used as a key
 // to find the actual value in a lookup table.
+{$IFDEF IMPSHELL}
 type
   TKind = (
     kSYM,  // an symbol or 'atom', represented internally by a string
@@ -58,9 +62,11 @@ type
             kind : TKind;
             data : integer;
           end;
+{$ENDIF}
 
-function ShowExpr( expr : TExpr ) : string;
-  forward; // for debugging
+{ }{$IFDEF IMPSHELL}
+{ }function ShowExpr( expr : TExpr ) : string; forward;
+{ }{$ENDIF}
 
 // Sx() provides a universal constructor for s-expressions.
 function Sx( kind : TKind; data : integer ) : TExpr;
@@ -115,6 +121,7 @@ var cells : TCellTbl;
 // Since we're using pascal for our meta language, we translate
 // m-expressions to pascal functions. We will allow defining
 // variables of up to 5 arguments.
+{$IFDEF IMPSHELL}
 type
   TMetaFun0 = function : TExpr;
   TMetaFun1 = function (a : TExpr) : TExpr;
@@ -148,6 +155,7 @@ type
     end;
 const
   aritykind : array[TArity] of TKind = (kMF0, kMF1, kMF2, kMF3, kMF4);
+{$ENDIF}
 var
   metas     : TMetaTbl;
   metacount : byte = 0;
@@ -260,10 +268,11 @@ function mCONS( x, y : TExpr ) : TExpr;
 // result in a syntax error and a type error in pascal (NIL is
 // already defined as the default pointer value), we will call
 // the symbol NULL.
-
+{$IFDEF IMPSHELL}
 var { boolean symbols }
   sNULL : TExpr;
   sTRUE : TExpr;
+{$ENDIF}
 
 // We will call this routine at startup to initialize them:
 procedure CreateBooleans;
@@ -550,6 +559,7 @@ procedure CreateSpecials;
 // We will create such a symbol now for all of the routines
 // of type (TExpr -> TExpr) that we've defined so far, as well as
 // the ones we're going to define later in the file.
+{$IFDEF IMPSHELL}
 var
   // the functions we've defined so far:
   sAtomP, sEqP, sCar, sCdr, sCons, sFF, sSubst, sEqualP, sNullP,
@@ -560,7 +570,8 @@ var
   sApply, sEval, sAppq,
   sList, sMapList, sSearch, sFilter, sReduce,
   sAdd, sSub, sMul, sDiv, sMod, sLog, sDif : TExpr;
-
+{$ENDIF}
+{ }{$IFDEF IMPSHELL}
   // ... for which we also have to provide forward declarations,
   // so we can refer to them when creating the kind=kMFx symbols:
   function mAPPLY  ( f, args : TExpr ) : TExpr; forward;
@@ -581,6 +592,7 @@ var
   function mPOW ( x, y : TExpr ) : TExpr; forward;
   function mLOG ( x, y : TExpr ) : TExpr; forward;
   function mDIF ( x, y : TExpr ) : TExpr; forward;
+{ }{$ENDIF}
 
 // We will also need a routine to bind names to their values at runtime,
 // but we'll postpone defining it until after we've defined mEVAL.
@@ -663,8 +675,11 @@ procedure CreateBuiltins;
 // usage: Vx(3) -> Sx(kINT, 3)
 // usage: VL([3]) -> L(Sx(kINT, 3))
 //
-function VL(vars : array of variant) : TExpr;
-  forward; // because they can call each other recursively
+
+{ }{$IFDEF IMPSHELL}
+// forward ref because they can call each other recursively.
+{ }function VL(vars : array of variant) : TExpr; forward;
+{ }{$ENDIF}
 
 function Vx(v : variant) : TExpr; overload;
   begin
@@ -1164,4 +1179,7 @@ begin
   CreateBuiltins;
   CreateSpecials;
   mENV := L(L(sTRUE, sTRUE)); // bind #t to itself
+{ }{$IFDEF IMPSHELL}
+  Shell;
+{ }{$ENDIF}
 end.
