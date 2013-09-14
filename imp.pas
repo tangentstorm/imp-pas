@@ -797,6 +797,7 @@ function mEVAL( e, a : TExpr ) : TExpr;
         else begin
           x := mASSOC(h, a);
           case x.kind of
+	    kERR : r := x;
 	    kMF0 : r := metas[x.data].f0();
 	    kMF1 : r := metas[x.data].f1(mCADR(e));
 	    kMF2 : r := metas[x.data].f2(mCADR(e), mCADDR(e));
