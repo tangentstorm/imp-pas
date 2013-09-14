@@ -370,6 +370,11 @@ function mCADR( x : TExpr ) : TExpr;
     result := mCAR(mCDR(x))
   end;
 
+function mCDDR( x : TExpr ) : TExpr;
+  begin
+    result := mCDR(mCDR(x))
+  end;
+
 // cadar[x] -> car[cdr[cdr[x]]]
 function mCADAR( x : TExpr ) : TExpr;
   begin
