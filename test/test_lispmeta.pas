@@ -62,11 +62,15 @@ procedure test_mAPPQ;
     cx('((quote a) (quote b))', mAPPQ(L(a,b)));
   end;
 
+procedure test_append;
+  begin
+    cx('(a b x y)', mAPPEND(L(a,b), L(x,y)))
+  end;
+
 procedure test_env;
   begin
     cx('((a x) (b y) (c z) (x 1) (y 2) (z 3))', env)
   end;
-
 
 // check eval
 procedure cev(s : string; x:TExpr);
@@ -90,6 +94,12 @@ procedure test_apply;
   begin
     cx('(a . b)', mAPPLY(sCons, L(a, b), mENV));
     cx('(a b)', mAPPLY(sCons, L(a, L(b)), mENV));
+  end;
+
+procedure test_arithmetic;
+  begin
+    cev('3', VL(['+', 1, 2 ]));
+    cev('9', L(Vx('*'), Nx(3), VL(['+', 1, 2 ])));
   end;
 
 end.

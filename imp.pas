@@ -15,7 +15,8 @@ interface {$I imp.def} implementation
 { }{$ELSE}
 program imp;
 { }{$ENDIF}
-uses xpc, arrays, stacks, ascii, sysutils, strutils, num, variants;
+uses xpc, arrays, stacks, ascii, sysutils, strutils, num, variants,
+  math;
 
 procedure halt( msg : string );
   begin
@@ -393,6 +394,16 @@ function mCADDR( x : TExpr ) : TExpr;
     result := mCAR(mCDR(mCDR(x)))
   end;
 
+function mCADDDR( x : TExpr ) : TExpr;
+  begin
+    result := mCAR(mCDR(mCDR(mCDR(x))))
+  end;
+
+function mCADDDDR( x : TExpr ) : TExpr;
+  begin
+    result := mCAR(mCDR(mCDR(mCDR(mCDR(x)))))
+  end;
+
 // - list builder - - - - - - - - - - - - - - - - - - - - - - - -
 
 // The function L will build lists as s-sexpressions. This
@@ -453,7 +464,7 @@ function L( a, b, c, d, e, f, g, h, i, j : TExpr ) : TExpr; inline;
 // append[x;y] -> append y to x
 function mAPPEND( x, y : TExpr ) : TExpr;
   begin
-    if mNULL(x) then result := L(x)
+    if mNULL(x) then result := y
     else result := mCONS(mCAR(x), mAPPEND(mCDR(x), y))
   end;
 
@@ -656,11 +667,11 @@ procedure CreateBuiltins;
     sSearch := Define('search', Meta(@mSEARCH));
     sFilter := Define('filter', Meta(@mFILTER));
     sReduce := Define('reduce', Meta(@mREDUCE));
-    sAdd := Define('add', Meta(@mADD));
-    sSub := Define('sub', Meta(@mSUB));
-    sMul := Define('mul', Meta(@mMUL));
-    sDiv := Define('div', Meta(@mDIV));
-    sMod := Define('mod', Meta(@mMOD));
+    sAdd := Define('+', Meta(@mADD));
+    sSub := Define('-', Meta(@mSUB));
+    sMul := Define('*', Meta(@mMUL));
+    sDiv := Define('%', Meta(@mDIV));
+    sMod := Define('|', Meta(@mMOD));
     sLog := Define('log', Meta(@mLOG));
     sDif := Define('dif', Meta(@mDIF));
   end;
@@ -804,11 +815,16 @@ function mEVAL( e, a : TExpr ) : TExpr;
           case x.kind of
 	    kERR : r := x;
 	    kMF0 : r := metas[x.data].f0();
-	    kMF1 : r := metas[x.data].f1(mCADR(e));
-	    kMF2 : r := metas[x.data].f2(mCADR(e), mCADDR(e));
-//	    kMF3 : r := metas[x.data].f3(mCADR(e), mCADDR(e), mCADDDR);
-//	    kMF4 : r := metas[x.data]
-//			.f4(mCADR(e), mCADDR(e), mCADDDR, mCADDDDR);
+	    kMF1 : r := metas[x.data].f1(mEVAL(mCADR(e), a));
+	    kMF2 : r := metas[x.data].f2(mEVAL(mCADR(e), a),
+					 mEVAL(mCADDR(e), a));
+	    kMF3 : r := metas[x.data].f3(mEVAL(mCADR(e), a),
+					 mEVAL(mCADDR(e), a),
+					 mEVAL(mCADDDR(e), a));
+	    kMF4 : r := metas[x.data].f4(mEVAL(mCADR(e), a),
+					 mEVAL(mCADDR(e), a),
+					 mEVAL(mCADDDR(e), a),
+					 mEVAL(mCADDDDR(e), a));
             else r := mEVAL(mCONS(x, mEVLIS(mCDR(e), a)), a)
           end
         end
@@ -859,30 +875,45 @@ function mREDUCE( f, x, y : TExpr ) : TExpr;
 
 //-- arithmetic  -----------------------------------------------
 
+function ints( x, y : TExpr; out errx : TExpr) : boolean;
+  begin
+    result := (x.kind = kINT) and (y.kind = kINT);
+    if not result then errx := Err('NaN');
+  end; { ints }
+
+function Nx( n : integer ) : TExpr;
+  begin
+    result := Sx(kINT, n)
+  end;
+
 function mADD( x, y : TExpr ) : TExpr;
   begin
-    if (x.kind <> kINT) or (x.kind <> kINT) then result := Err('NaN')
-    else result := Sx(kINT, x.data + y.data)
+    if ints(x,y,result) then result := Nx(x.data + y.data)
   end;
 
 function mSUB( x, y : TExpr ) : TExpr;
   begin
+    if ints(x,y,result) then result := Nx(x.data - y.data)
   end;
 
 function mMUL( x, y : TExpr ) : TExpr;
   begin
+    if ints(x,y,result) then result := Nx(x.data * y.data)
   end;
 
 function mDIV( x, y : TExpr ) : TExpr;
   begin
+    if ints(x,y,result) then result := Nx(x.data div y.data)
   end;
 
 function mMOD( x, y : TExpr ) : TExpr;
   begin
+    if ints(x,y,result) then result := Nx(x.data mod y.data)
   end;
 
 function mPOW( x, y : TExpr ) : TExpr;
   begin
+    if ints(x,y,result) then result := Nx(x.data ** y.data)
   end;
 
 function mLOG( x, y : TExpr ) : TExpr;
