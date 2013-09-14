@@ -782,8 +782,6 @@ function mEVAL( e, a : TExpr ) : TExpr;
     result := r
   end; { mEVAL }
 
-var mENV : TExpr; // todo: initialize.
-
 function mBIND( iden, value : TExpr ) : TExpr;
   begin
     {---
@@ -1086,9 +1084,10 @@ function FQuote( var expr : TExpr ) : TExpr;
     result := expr
   end;
 
+var mENV : TExpr; // initial environment
 function Eval( itm : TExpr ) : TExpr;
   begin
-    result := mEVAL(itm, sNULL)
+    result := mEVAL(itm, mENV)
   end;
 
 //== print part ================================================
@@ -1164,4 +1163,5 @@ begin
   CreateBooleans;
   CreateBuiltins;
   CreateSpecials;
+  mENV := L(L(sTRUE, sTRUE)); // bind #t to itself
 end.
