@@ -452,11 +452,12 @@ function mZIP( x, y : TExpr ) : TExpr;
                          mZIP(mCDR(x), mCDR(y)))
   end;
 
-// assoc[x;y] look up x in dictionary y
-function mASSOC( x, y : TExpr ) : TExpr;
+// assoc[s;a] look up symbol s in alist a where a = ((k0,v0) (k1,v1) ...)
+function mASSOC( s, a : TExpr ) : TExpr;
   begin
-    if mEQ(mCAAR(y), x) then result := mCADAR(y)
-    else result := mASSOC(x, mCDR(y))
+    if mNULL(a) then result := sNULL
+    else if mEQ(mCAAR(a), s) then result := mCADAR(a)
+    else result := mASSOC(s, mCDR(a))
   end;
 
 // sublis[x;y] -> subst uN->vN in y, where x=((u0,v0), (u1,v1)...)
