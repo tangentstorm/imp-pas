@@ -19,8 +19,13 @@ run: imp
 impraw:
 	$(FPC) -dNOPROMPT -vn imp.pas -oimpraw
 
+imptest:
+	$(FPC) -dIMPTEST -vn imp.pas -oimptest
+	$(GEN)/imptest
+
 test: impraw
 	test/orgtest.py $(GEN)/impraw test/lisptests.org
+
 roots: impraw
 	test/orgtest.py $(GEN)/impraw test/roots.org
 

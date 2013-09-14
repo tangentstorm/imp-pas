@@ -1129,6 +1129,8 @@ procedure Print( expr : TExpr );
     WriteLn(ShowExpr(expr));
   end;
 
+{$IFDEF IMPTEST}{$I imptest.pas}{$ENDIF}
+
 var val : TExpr;
 begin
   syms := TSymTbl.Create;
@@ -1138,6 +1140,7 @@ begin
   CreateBooleans;
   CreateBuiltins;
   CreateSpecials;
+  {$IFDEF IMPTEST}RunTests; System.Halt;{$ENDIF}
   repeat Print(Eval(ReadNext(val)))
   until (val.kind = kERR)
 end.
