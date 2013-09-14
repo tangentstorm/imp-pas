@@ -742,41 +742,44 @@ function mEVAL( e, a : TExpr ) : TExpr;
       else result := mCONS(mEVAL(mCAR(m), a), mEVLIS(mCDR(m), a))
     end; { mEVLIS }
 
-  function trace(step:string) : boolean;
-    var cmd: string;
-    begin
-      writeln('eval(', step, '):', ShowExpr(e));
-      readln(cmd); if cmd = 'q' then halt('okthxbye');
-      result := true;
-    end;
-
-  var h : TExpr;
+  var
+    h{head}, r{result} : TExpr;
   begin { mEVAL }
-    trace('start');
-    if mATOM(e) and trace('atom!') then result := mASSOC(e, a)
-    else begin
-      h := mCAR(e);
-      if mATOM(h) then
-        if mEQ(h, sQUOTE) then result := mCADR(e)
-        else if mEQ(h, sAtomP) then result := mATOMP(mEVAL(mCADR(e), a))
-        else if mEQ(h, sEQP) then result := mEQP(mEVAL(mCADR(e), a),
-                                                 mEVAL(mCADDR(e), a))
-        else if mEQ(h, sCOND) then result := mEVCON(mCDR(e), a)
-        else if mEQ(h, sCAR) then result := mCAR(mEVAL(mCADR(e),a))
-        else if mEQ(h, sCDR) then result := mCDR(mEVAL(mCADR(e),a))
-        else if mEQ(h, sCONS) then result := mCONS(mEVAL(mCADR(e), a),
-                                                   mEVAL(mCADDR(e), a))
-        else result := mEVAL(mCONS(mASSOC(mCAR(e), a),
-                                   mEVLIS(mCDR(e), a)), a)
-      { else h is a list }
-      else if mEQ(mCAR(h), sLABEL) then
-        result := mEVAL(mCONS(mCADDAR(e), mCDR(e)),
-                        mCONS(L(mCADAR(e), mCAR(e)), a))
-      else if mEQ(mCAR(h), sLAMBDA) then
-        result := mEVAL(mCADDAR(e),
-                        mAPPEND(mZIP(mCADAR(e),
-                                     mEVLIS(mCDR(e), a)), a))
-    end;
+    trace('eval', e);
+    if mATOM(e) then r := mASSOC(e, a)
+    else if mATOM(mCAR(e)) then
+      begin
+        h := mCAR(e);
+        { eval[(QUOTE X), a] -> X # 1 argument only }
+        if mEQ(h, sQUOTE) then r := mCADR(e)
+        { eval[(ATOM? X), a] -> atom?[eval[X]] }
+        else if mEQ(h, sATOMP) then r := mATOMP(mEVAL(mCADR(e), a))
+        { eval[(EQ? X Y), a] -> eq?[eval[X,a] eval[Y,a]] }
+        else if mEQ(h, sEQP) then r := mEQP(mEVAL(mCADR(e), a),
+                                            mEVAL(mCADDR(e), a))
+        { eval[(COND h|t), a] -> evcon[h|t, a] }
+        else if mEQ(h, sCOND) then r := mEVCON(mCDR(e), a)
+        { eval[(CAR X), a] -> car[eval[X, a]] }
+        else if mEQ(h, sCAR) then r := mCAR(mEVAL(mCADR(e), a))
+        { eval[(CDR X), a] -> cdr[eval[X, a]] }
+        else if mEQ(h, sCDR) then r := mCDR(mEVAL(mCADR(e), a))
+        { eval[(CONS X Y), a] -> cons[eval[X, a], eval[Y, a]] }
+        else if mEQ(h, sCONS) then r := mCONS(mEVAL(mCADR(e), a),
+                                              mEVAL(mCADDR(e), a))
+        { eval[h|t, a] -> eval[cons[eval[h,a], evlis[t, a]], a] }
+        else r := mEVAL(mCONS(mASSOC(mCAR(e), a),
+                              mEVLIS(mCDR(e), a)), a)
+      end
+    { eval[((LABEL X Y) Z), a] -> eval[cons[Y Z], cons[(X Y), a]] }
+    else if mEQ(mCAAR(e), sLABEL) then
+      r := mEVAL(mCONS(mCADDAR(e), mCDR(e)),
+                 mCONS(L(mCADAR(e), mCAR(e)), a))
+    { eval[((LAMBDA X Y) Zz),a] -> eval[Y, append[zip[X, evlis[Zz]],a]] }
+    else if mEQ(mCAAR(e), sLAMBDA) then
+      r := mEVAL(mCADDAR(e),
+                 mAPPEND(mZIP(mCADAR(e),
+                              mEVLIS(mCDR(e), a)), a));
+    result := r
   end; { mEVAL }
 
 var mENV : TExpr; // todo: initialize.
@@ -789,8 +792,6 @@ function mBIND( iden, value : TExpr ) : TExpr;
                   mCDR(mENV));
     ---}
   end;
-
-
 
 function mLIST ( x : TExpr ) : TExpr;
   begin
