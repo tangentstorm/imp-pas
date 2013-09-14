@@ -53,6 +53,9 @@ type
             data : integer;
           end;
 
+function ShowExpr( expr : TExpr ) : string;
+  forward; // for debugging
+
 // Sx() provides a universal constructor for s-expressions.
 function Sx( kind : TKind; data : integer ) : TExpr;
   begin
@@ -76,6 +79,14 @@ function Key( s :  string ) : cardinal;
   begin
     if not syms.Find( s, result ) then result := syms.Append( s );
   end; { Key }
+
+// To expose a symbolic name to the interpreter, we can create
+// symbols with Sx(kSYM, Key('name')), but it would be nicer if
+// we could simplify it to Sym('name'). So:
+function Sym( s : string ) : TExpr;
+  begin
+    result := Sx(kSYM, Key(s))
+  end;
 
 // - cells - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // An S-expression where kind=kCEL is a cell. Cells are simply
@@ -171,6 +182,17 @@ function Meta( f : TMetaFun4 ) : TExpr; overload;
   begin NextMeta(4, @f) end;
 
 // We will populate this table in section e2.
+
+// - debugger - - - - - - - - - - - - - - - - - - - - - - - - -
+
+function trace(step:string; e : TExpr) : boolean;
+  var cmd: string;
+  begin
+    writeln( step, ':', ShowExpr(e));
+    readln(cmd); if cmd = 'q' then halt('goodbye');
+    result := true;
+  end;
+
 
 //-- c. elementary meta-expressions ----------------------------
 
@@ -468,7 +490,7 @@ function mSUBLIS( x, y : TExpr ) : TExpr;
 // represents the s-expression translation of m-expression E.
 
 // e1.QUOTE
-// e4. COND
+// e4.COND
 // e5.LAMBDA and
 // e6.LABEL
 //
@@ -484,14 +506,6 @@ function q(x:TExpr) : TExpr;
   begin
     result := L(sQUOTE, x)
   end; { q }
-
-// To expose a symbolic name to the interpreter, we can create
-// symbols with Sx(kSYM, Key('name')), but it would be nicer if
-// we could simplify it to Sym('name'). So:
-function Sym( s : string ) : TExpr;
-  begin
-    result := Sx(kSYM, Key(s))
-  end;
 
 // Once again, we'll create a procedure to initialize these
 // for us and invoke the procedure at startup.
@@ -697,16 +711,13 @@ function VL(vars : array of variant) : TExpr;
 function mAPPQ( m : TExpr ) : TExpr;
   begin
     if mNULL(m) then result := sNULL
-    else result := mCONS(L(sQUOTE, mCAR(m)), mAPPQ(mCDR(m)))
+    else result := mCONS(q(mCAR(m)), mAPPQ(mCDR(m)))
   end;
 
 function mAPPLY( f, args : TExpr ) : TExpr;
   begin
     result := mEVAL(mCONS(f, mAPPQ(args)), sNULL)
   end;
-
-function ShowExpr( expr : TExpr ) : string;
-  forward; // for debugging
 
 function mEVAL( e, a : TExpr ) : TExpr;
 
@@ -1034,7 +1045,7 @@ function ReadNext( out value : TExpr ): TExpr;
     begin
       NextChar(ch);
       if ReadNext(result).kind <> kERR
-      then result := MCons(Sx(kSym, Key('quote')), result)
+      then result := q(result)
     end; { ReadQuote }
 
   begin
