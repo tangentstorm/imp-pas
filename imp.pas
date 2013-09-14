@@ -1202,7 +1202,6 @@ begin
   mENV := L(L(sTRUE, sTRUE)); // bind #t to itself
   CreateBuiltins;
   CreateSpecials;
-  WriteLn(ShowExpr(mENV));
 { }{$IFDEF IMPSHELL}
   Shell;
 { }{$ENDIF}
