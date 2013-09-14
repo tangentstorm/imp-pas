@@ -278,7 +278,7 @@ var { boolean symbols }
 procedure CreateBooleans;
   begin
     sNULL := Sx(kNUL, Key('()'));
-    sTRUE := Sx(kSYM, Key('&t'));
+    sTRUE := Sx(kSYM, Key('T'));
   end;
 
 // To translate:
