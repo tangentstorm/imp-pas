@@ -86,4 +86,10 @@ procedure test_eval_quote;
     cev('(cons a b)', q(L(sCons, a, b)));
   end;
 
+procedure test_apply;
+  begin
+    cx('(a . b)', mAPPLY(sCons, L(a, b), mENV));
+    cx('(a b)', mAPPLY(sCons, L(a, L(b)), mENV));
+  end;
+
 end.

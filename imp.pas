@@ -586,7 +586,7 @@ var
 { }{$IFDEF IMPSHELL}
   // ... for which we also have to provide forward declarations,
   // so we can refer to them when creating the kind=kMFx symbols:
-  function mAPPLY  ( f, args : TExpr ) : TExpr; forward;
+  function mAPPLY  ( f, args, env : TExpr ) : TExpr; forward;
   function mEVAL   ( e, a : TExpr ) : TExpr; forward;
   function mAPPQ   ( m : TExpr ) : TExpr; forward;
   function mLIST   ( x : TExpr ) : TExpr; forward;
@@ -749,9 +749,9 @@ function mAPPQ( m : TExpr ) : TExpr;
     else result := mCONS(q(mCAR(m)), mAPPQ(mCDR(m)))
   end;
 
-function mAPPLY( f, args : TExpr ) : TExpr;
+function mAPPLY( f, args, env : TExpr ) : TExpr;
   begin
-    result := mEVAL(mCONS(f, mAPPQ(args)), sNULL)
+    result := mEVAL(mCONS(f, mAPPQ(args)), env)
   end;
 
 function mEVAL( e, a : TExpr ) : TExpr;
