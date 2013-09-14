@@ -667,6 +667,7 @@ function Vx(v : variant) : TExpr; overload;
       varNULL : result := sNULL;
 
       varSmallInt,
+      varShortInt,
       varByte,
       varWord,
       varInteger : result := Sx(kINT, v);
