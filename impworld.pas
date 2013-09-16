@@ -5,53 +5,9 @@ uses
   sysutils, // AppendStr, FormatDateTime
   kvm,      // fg, gotoxy, clreol
   cw,       // cxy(color, x, y, string)
+  num,      // n2s
   kbd;      // keypressed/readkey
 
-
-{-- misc -------------------------}
-const
-  on = true;
-  off = false;
-type
-  set32 = set of 0..31;
-  thunk = procedure;
-
-procedure discard(var value);
-  begin
-  end;
-
-function assigned(p : pointer):boolean;
-  begin
-    assigned := p <> nil
-  end;
-
-{-- string routines ------}
-
-function ChNTimes( ch: char; n: byte ):string;
-  var i : byte;
-  begin
-    SetLength( result, n );
-    for i := 1 to n do result[ i ] := ch;
-  end;
-
-function n2s( i : longint ) : string;
-  begin
-    Str( i, result );
-  end;
-
-function flushrt( s:string; size:byte; ch:char ) : string;
-  var gap : shortint;
-  begin
-    gap := size - length(s);
-    if gap > 0
-      then flushrt := chntimes(ch, gap) + s
-      else flushrt := s
-  end;
-
-function boolchar( cond : boolean; ch0, ch1 : char ): char;
-  begin
-    if cond then boolchar := ch0 else boolchar := ch1
-  end;
 
 {-- dynamic types -----------------}
 type
