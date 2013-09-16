@@ -16,7 +16,7 @@ interface {$I imp.def} implementation
 program imp;
 { }{$ENDIF}
 uses xpc, arrays, stacks, ascii, sysutils, strutils, num, variants,
-  math;
+  math, lined;
 
 procedure halt( msg : string );
   begin
@@ -209,7 +209,8 @@ function trace(step:string; e : TExpr) : boolean;
   var cmd: string;
   begin
     writeln( step, ':', ShowExpr(e));
-    readln(cmd); if cmd = 'q' then halt('goodbye');
+    lined.prompt('debug>', cmd);
+    if cmd = 'q' then halt('goodbye');
     result := true;
   end;
 
@@ -950,9 +951,9 @@ var
   debugging : boolean = true;
   ShowFormat : TFormat = fmtLisp;
 var
-  line   : string;
+  line	 : string = '';
   lx, ly : cardinal;
-  done   : boolean = false;
+  done	 : boolean = false;
 
 function k2s( kind :  TKind ) : string;
   begin
@@ -989,15 +990,17 @@ function Depth : cardinal;
 
 function NextChar( var ch : char ) : char;
   procedure prompt;
+    var ps : string; // prompt string
     begin
       { write the prompt first, because eof() blocks. }
       {$IFDEF NOPROMPT}
       {$NOTE compiling without prompt}
       {$ELSE}
       if length(nest) > 0
-        then write( nest, prompt1 )
-        else write( prompt0 );
+	then ps := nest + prompt1
+        else ps := prompt0;
       {$ENDIF}
+      {$IFDEF NOPROMPT}
       if eof then begin
         ch := ascii.EOT;
         line := ch;
@@ -1005,12 +1008,14 @@ function NextChar( var ch : char ) : char;
         if depth > 0 then halt( 'unexpected end of file' );
         writeln;
         system.halt;
-      end else begin
-        readln( line );
+      end else
+      {$ENDIF}
+      if lined.prompt(ps, line) then begin
+	writeln;
         line := line + ascii.LF; { so we can do proper lookahead. }
         inc( ly );
         lx := 0;
-      end
+      end else system.halt;
     end;
   begin
     while lx + 1 > length( line ) do prompt;
@@ -1072,7 +1077,7 @@ function ReadString : TExpr;
   end;
 
 procedure HandleDirective;
-  var s : string;
+  var s : string = '';
   begin
     while ch <> ascii.LF do s += NextChar(ch);
     if AnsiStartsStr('fmt:struct', s) then showFormat := fmtStruct;
@@ -1228,6 +1233,10 @@ procedure Shell;
   begin
     repeat Print(Eval(ReadNext(val)))
     until (val.kind = kERR)
+  end;
+
+procedure complete( const s : string; var comp : lined.Completions );
+  begin
   end;
 
 begin
