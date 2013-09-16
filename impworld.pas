@@ -1,6 +1,7 @@
-program RETROP;
-uses crt, dos, objects, drivers, views;
-
+{$mode objfpc}{$h+}
+program impworld;
+uses xpc, kvm, sysutils, cw, dos, objects, drivers;
+
 {-- misc -------------------------}
 const
   on = true;
@@ -8,10 +9,6 @@ const
 type
   set32 = set of 0..31;
   thunk = procedure;
-
-procedure pass;
-  begin
-  end;
 
 procedure discard(var value);
   begin
@@ -21,32 +18,23 @@ function assigned(p : pointer):boolean;
   begin
     assigned := p <> nil
   end;
-
-
+
 {-- string routines ------}
 
-procedure SetLength(var s:string; len:byte);
-  begin
-    s[0] := chr(len);
-  end;
-
 function ChNTimes( ch: char; n: byte ):string;
-  var result:string; i : byte;
+  var i : byte;
   begin
     SetLength( result, n );
     for i := 1 to n do result[ i ] := ch;
-    ChNTimes := result;
   end;
 
 function n2s( i : longint ) : string;
-  var result : string[11];
   begin
     Str( i, result );
-    n2s := result;
   end;
 
 function flushrt( s:string; size:byte; ch:char ) : string;
-  var gap : shortint; result : string;
+  var gap : shortint;
   begin
     gap := size - length(s);
     if gap > 0
@@ -58,45 +46,13 @@ function boolchar( cond : boolean; ch0, ch1 : char ): char;
   begin
     if cond then boolchar := ch0 else boolchar := ch1
   end;
-
+
 {-- screen IO --------------------}
 const
   kScrW = 80;
   kScrH = 25;
-type
-  ScreenBuff = ^ScreenData;
-  ScreenData = array[ 0 .. (2 * kScrH * kScrW)-1 ] of byte;
-var
-  screen: ScreenData;// absolute $B800:$0000;
-  view  : TView;  { to get cursor support and string drawing }
-  drawto: ScreenBuff;
-  buffln: TDrawBuffer;  { a single line of char+attr words }
 
-procedure colorXY( c, x, y : byte; s : string);
-  var i : byte; offs : word;
-  begin
-    offs := 2 * (y * kScrw + x);
-    FillChar(drawto^[offs], length(s)*2, c);
-    for i := 1 to length(s) do
-      begin
-        drawto^[offs] := byte(s[i]);
-        inc(offs,2)
-      end
-  end;
-
-{ use 16 background colors instead of blinking text }
-procedure blinking( b : boolean );
-  begin
-{$ifdef TURBO}
-   asm
-     mov ah,$10;
-     mov al,$03;
-     mov bl,b;
-     int 10h;
-   end
-{$ENDIF}
- end;
-
+
 {-- dynamic types -----------------}
 type
    Obj = ^BaseObj; { base type for all objects }
@@ -105,7 +61,6 @@ type
    Str = ^StrObj;  { a pascal string }
                    { TODO : Txt = ^TxtObj; }
   Cell = ^CellObj;
-   Ref = ^RefObj;
 
   BaseObj = object(objects.TObject)
     function Str: string; virtual;
@@ -131,14 +86,9 @@ type
     function Str: string; virtual; { override }
   end;
 
-  RefObj = object(AtomObj)
-    head, tail : Obj;
-  end;
-
 var
-  null : Atom;
-  root : Ref;
-
+  null : Atom = nil;
+
 function BaseObj.Str : string;
   begin
     Str := '$';
@@ -147,7 +97,7 @@ function BaseObj.Str : string;
 destructor BaseObj.Destroy;
   begin
   end;
-
+
 function IntObj.Str : string;
   begin
     Str := n2s( value );
@@ -157,7 +107,7 @@ function StrObj.Str : string;
   begin
     Str := value;
   end;
-
+
 constructor CellObj.Create( headObj, tailObj : Obj );
   begin
     head := headObj;
@@ -167,14 +117,13 @@ constructor CellObj.Create( headObj, tailObj : Obj );
   end;
 
 function CellObj.Str : string;
-  var result : string;
   begin
     result := '(' + head^.Str;
     if pointer(tail) = pointer(null) then
-      result := result + ' ' + tail^.Str;
-    Str := result  + ')';
+      AppendStr(result, ' ' + tail^.Str);
+    AppendStr(result, ')');
   end;
-
+
 {-- fixed-size data blocks --------}
 type
   Block = array[ 0 .. 1023 ] of byte;
@@ -185,6 +134,7 @@ type
   Bytes  = array[ 0..0 ] of byte;
   Buffer = ^Bytes;
 
+
 {-- display -----------------------}
 type
 
@@ -207,7 +157,7 @@ function Quad.y2 : integer;
   begin
     y2 := y + h
   end;
-
+
 {-- tagged data types -------------}
 type
   Tagged  = ^TaggedObj;
@@ -226,7 +176,7 @@ type
     sym : Symbol;
     line, column, span : longint;
   end;
-
+
 {-- Tuples ---------------------------}
 type
   TypeDef  = ^TypeDefObj;
@@ -251,7 +201,7 @@ type
     meta : TypeDef;
     data : Buffer;
   end;
-
+
 {-- actors ------------------------}
 const
   cmd_quit  =  -1;
@@ -286,7 +236,7 @@ type
     procedure Add( a : Actor );
     function Handle( msg : Message ):boolean; virtual;
   end;
-
+
   MorphObj = object( GroupObj )
     bounds : Quad;
     colors : word; { foreground and background }
@@ -299,7 +249,7 @@ type
     sender: Actor;
     args: Tuple;
   end;
-
+
 
 constructor ActorObj.Create;
   begin
@@ -327,7 +277,7 @@ function ActorObj.Handle( msg : Message ):boolean;
       else handle := false
     end
   end;
-
+
 constructor GroupObj.Create;
   begin
     self.count := 0;
@@ -343,7 +293,7 @@ procedure GroupObj.Add( a : Actor );
   end;
 
 function GroupObj.Handle( msg: Message ):boolean;
-  var handled : boolean; i : byte;
+  var handled : boolean; i : byte = 0;
   begin
     handled := false;
     while not handled and (i < self.count) do
@@ -353,7 +303,7 @@ function GroupObj.Handle( msg: Message ):boolean;
       end;
     handle := handled
   end;
-
+
 constructor MorphObj.Create;
   begin
     ActorObj.Create;
@@ -368,7 +318,7 @@ procedure MorphObj.Draw;
   begin
     WriteLn('morph')
   end;
-
+
 {-- ClockMorph -------------}
 type
   ClockMorph = ^ClockObj;
@@ -401,7 +351,7 @@ procedure ClockObj.Render;
   begin
     colorxy( color, bounds.x, bounds.y, self.str )
   end;
-
+
 {-- stack -------------------}
 type
   Stack    = ^StackObj;
@@ -420,24 +370,28 @@ type
 
 procedure StackObj.Push( val : longint );
   begin
-    slots[count] := val;
-    inc(count)
+    slots[count] := val; inc(count)
   end;
 
 function StackObj.Pop : longint;
   begin
-    Dec(count);
-    Pop := slots[count];
+    Dec(count); Pop := slots[count];
   end;
 
-function StackObj.tos : longint;
+function StackObj.tos : longint; inline;
   begin
     tos := slots[count-1]
   end;
 
-function StackObj.nos : longint;
+function StackObj.nos : longint; inline;
   begin
     nos := slots[count-2]
+  end;
+
+
+procedure StackObj.Dup;
+  begin
+    Push(tos)
   end;
 
 procedure StackObj.Swap;
@@ -446,11 +400,6 @@ procedure StackObj.Swap;
     tmp := tos;
     slots[ count-1 ] := nos;
     slots[ count-2 ] := tmp;
-  end;
-
-procedure StackObj.Dup;
-  begin
-    Push(tos)
   end;
 
 procedure StackObj.Over;
@@ -466,7 +415,7 @@ procedure StackObj.Rot;
     slots[count-2] := slots[count-1];
     slots[count-1] := tmp;
   end;
-
+
 {-- virtual machine ------------}
 type
   OpCode = (opNop, opNot, opXor, opAnd,
@@ -489,7 +438,7 @@ type
     procedure Render; virtual; { override; }
     procedure RunOp( op:OpCode );
   end;
-
+
 procedure MachineObj.RunOp( op:OpCode );
   var temp : longint;
   begin
@@ -556,7 +505,7 @@ procedure MachineObj.Render;
       for j := 8 to 16 do
         colorxy( random(8), i, j, 'x' );
   end;
-
+
 {-- concurrency --------------------}
 
 var actors : array[ 0 .. 254 ] of Actor;
@@ -578,8 +527,7 @@ procedure Register(this:Actor);
       end
   end;
 
-
-
+
 {-- event system ---------}
 const
   evt_keydn = -25;
@@ -600,7 +548,7 @@ constructor EventObj.Create(etag:longint; e:TEvent);
     tag  := etag;
     data := e;
   end;
-
+
 {-- simple dictionary lookup ----}
 
 type
@@ -620,7 +568,7 @@ type
     name : string[32];
     item : obj;
   end;
-
+
 constructor DictObj.Create;
   begin
     nextdict := nil;
@@ -653,7 +601,7 @@ function DictObj.Lookup( s : string; var item : Obj): boolean;
         end;
     lookup := found;
   end;
-
+
 {-- interpreter widget ---}
 
 type
@@ -682,22 +630,22 @@ constructor ShellObj.Create;
     self.Clear;
     words := New(Dict, Create);
   end;
-
+
 procedure ShellObj.invoke( cmd : string );
   var o : obj;
   begin
 
     if words^.Lookup(cmd, o) then
       begin
-        TextColor(green);
+	kvm.fg('g');
         writeln( o^.Str );
       end
     else
       begin
-        gotoxy(0, hi(windmax)); writeln; { to scroll }
-        gotoxy(0, hi(windmax)-2);
-        TextColor(red); write('unknown command: ');
-        TextColor(yellow); write(cmd); clreol; writeln;
+        gotoxy(0, maxY); writeln; { to scroll }
+        gotoxy(0, maxY-2);
+        fg('r'); write('unknown command: ');
+        fg('Y'); write(cmd); clreol; writeln;
       end;
     gotoxy(1,1); clreol; { clear the random junk after the scroll }
   end;
@@ -707,7 +655,7 @@ procedure ShellObj.Clear;
     cmdstr := '';
     curpos := 1;
   end;
-
+
 function ShellObj.Handle( msg : Message ) : boolean;
   var ch : char;
   begin
@@ -729,7 +677,7 @@ function ShellObj.Handle( msg : Message ) : boolean;
       end
     else handle := false;
   end;
-
+
 procedure ShellObj.Render;
   begin
     colorxy($1e, 0, kScrH-1, '> ');
@@ -746,7 +694,7 @@ destructor ShellObj.destroy;
     clock^.alive := false;
     {inherited} ActorObj.Destroy;
   end;
-
+
 {-- main program ---------}
 var
   focus : Morph;
@@ -758,7 +706,6 @@ procedure Create;
     focus := New(Shell, Create);
     Register(focus);
     InitVideo; ClearScreen;
-    drawto := @screen;
     ShowMouse;
   end;
 
@@ -767,23 +714,18 @@ function NextKeyEvent( var e : TEvent ):boolean;
     GetKeyEvent(e);
     NextKeyEvent := e.what <> evNothing;
   end;
-
+
 procedure Update;
   var i : byte; e : TEvent; a : Actor; msg:Event;
   begin
     if NextKeyEvent(e) then
       case e.KeyCode of
-        kbEsc  : halt;
+        kbEsc : halt;
       else
-        case chr(e.KeyCode) of
-          '0'  : blinking(on);
-          '1'  : blinking(off);
-        else
-          msg := New(Event, Create(evt_keydn, e));
-          if not focus^.handle(msg) then
-            pass; {-- todo global keymap --}
-          Dispose(msg, Destroy)
-        end
+	msg := New(Event, Create(evt_keydn, e));
+	if not focus^.handle(msg) then
+	  pass; {-- todo global keymap --}
+	Dispose(msg, Destroy)
       end;
 
     { dispatch to all actors }
@@ -791,23 +733,19 @@ procedure Update;
     while i < numActors do
       begin
         a := actors[ i ];
-        if a^.active then
-          begin
-            a^.Update;
-            if a^.alive then
-              inc(i)
-            else
-              begin
-                Dec(numActors);
-                Dispose(a, Destroy);
-                actors[ i ] := Actors[ numActors ];
-                actors[ numActors ] := nil;
-              end
-          end
-        else inc(i) { was inactive, skip over for now }
+        if a^.active then begin
+	  a^.Update;
+	  if a^.alive then inc(i)
+	  else begin
+	    Dec(numActors);
+	    Dispose(a, Destroy);
+	    actors[ i ] := Actors[ numActors ];
+	    actors[ numActors ] := nil;
+	  end
+	end else inc(i) { was inactive, skip over for now }
       end
   end;
-
+
 procedure Render;
   var i : byte;
   begin
@@ -823,7 +761,6 @@ procedure Destroy;
     DoneVideo;
   end;
 
-var rect : TRect;
 begin
   Create;
   repeat
