@@ -1,6 +1,12 @@
-{$mode objfpc}{$h+}
+{$i xpc.inc}{$mode objfpc}{$h+}
 program impworld;
-uses xpc, kvm, sysutils, cw, dos, objects, drivers;
+uses
+  xpc,      // pass, general compatability
+  sysutils, // AppendStr, FormatDateTime
+  kvm,      // fg, gotoxy, clreol
+  cw,       // cxy(color, x, y, string)
+  kbd;      // keypressed/readkey
+
 
 {-- misc -------------------------}
 const
@@ -47,12 +53,6 @@ function boolchar( cond : boolean; ch0, ch1 : char ): char;
     if cond then boolchar := ch0 else boolchar := ch1
   end;
 
-{-- screen IO --------------------}
-const
-  kScrW = 80;
-  kScrH = 25;
-
-
 {-- dynamic types -----------------}
 type
    Obj = ^BaseObj; { base type for all objects }
@@ -62,7 +62,8 @@ type
                    { TODO : Txt = ^TxtObj; }
   Cell = ^CellObj;
 
-  BaseObj = object(objects.TObject)
+  BaseObj = object
+    constructor Create;
     function Str: string; virtual;
     destructor Destroy; virtual;
   end;
@@ -89,6 +90,10 @@ type
 var
   null : Atom = nil;
 
+constructor BaseObj.Create;
+  begin
+  end;
+
 function BaseObj.Str : string;
   begin
     Str := '$';
@@ -331,25 +336,18 @@ type
 
 constructor ClockObj.Create;
   begin
-    { inherited } MorphObj.Create;
-    color := $03; { cyan on blue }
+    inherited Create;
+    color := $13; { cyan on blue }
   end;
 
-function ClockObj.Str: string;  { 1218.93 12:40:00 }
-  var h, h2, mi, s, n: word;
+function ClockObj.Str: string;
   begin
-    dos.gettime( h, mi, s, n );
-    h2 := h mod 12;
-    if h2 = 0 then h2 := 12;
-    Str := flushrt( n2s( h2 ), 2, '0' ) + ':' +
-           flushrt( n2s( mi ), 2, '0' ) + ':' +
-           flushrt( n2s( s ),  2, '0' ) +
-           boolchar( h < 12, 'a', 'p');
+    result := FormatDateTime('MM.DD.YY hh:mm:ssam/pm', Now);
   end;
 
 procedure ClockObj.Render;
   begin
-    colorxy( color, bounds.x, bounds.y, self.str )
+    cw.cxy( color, bounds.x, bounds.y, self.str )
   end;
 
 {-- stack -------------------}
@@ -499,11 +497,10 @@ procedure MachineObj.Update;
   end;
 
 procedure MachineObj.Render;
-  var i,j : integer;
+  var i, j : integer;
   begin
-    for i := 32 to 64 do
-      for j := 8 to 16 do
-        colorxy( random(8), i, j, 'x' );
+    for i := 32 to 64 do for j := 8 to 16 do
+      cw.cxy( random(8), i, j, 'x' );
   end;
 
 {-- concurrency --------------------}
@@ -537,17 +534,18 @@ const
   evt_mosmv = -29;
 
 type
-  Event = ^EventObj;
+  Event    = ^EventObj;
   EventObj = object(MessageObj)
-    data : TEvent;
-    constructor Create(etag: longint; e:TEvent);
+    data : integer;
+    constructor Create(etag: integer; e:integer);
   end;
 
-constructor EventObj.Create(etag:longint; e:TEvent);
+constructor EventObj.Create(etag:integer; e:integer);
   begin
     tag  := etag;
     data := e;
   end;
+
 
 {-- simple dictionary lookup ----}
 
@@ -622,10 +620,10 @@ type
 
 constructor ShellObj.Create;
   begin
-    {inherited} MorphObj.Create;
+    inherited Create;
     vm := New(Machine, Create); register(vm);
     clock := New(ClockMorph, Create);
-    clock^.bounds.x := 3; clock^.bounds.y := 3;
+    clock^.bounds.x := 0; clock^.bounds.y := 0;
     Register(clock);
     self.Clear;
     words := New(Dict, Create);
@@ -637,17 +635,17 @@ procedure ShellObj.invoke( cmd : string );
 
     if words^.Lookup(cmd, o) then
       begin
-	kvm.fg('g');
+        kvm.fg('g');
         writeln( o^.Str );
       end
     else
       begin
         gotoxy(0, maxY); writeln; { to scroll }
-        gotoxy(0, maxY-2);
-        fg('r'); write('unknown command: ');
-        fg('Y'); write(cmd); clreol; writeln;
+        gotoxy(0, maxY-1);
+        kvm.fg('r'); write('unknown command: ');
+        kvm.fg('Y'); write(cmd); kvm.clreol; writeln;
       end;
-    gotoxy(1,1); clreol; { clear the random junk after the scroll }
+    gotoxy(0,0); clreol; { clear top line after the scroll }
   end;
 
 procedure ShellObj.Clear;
@@ -662,8 +660,9 @@ function ShellObj.Handle( msg : Message ) : boolean;
     if msg^.tag = evt_keydn then with Event(msg)^ do
       begin
         handle := true;
-        ch := chr(data.keyCode);
+        ch := chr(data);
         case ch of
+          ^C : halt;
           ^H : if length(cmdstr) > 0 then
                   SetLength(cmdstr, length(cmdstr)-1)
                else pass;
@@ -680,19 +679,17 @@ function ShellObj.Handle( msg : Message ) : boolean;
 
 procedure ShellObj.Render;
   begin
-    colorxy($1e, 0, kScrH-1, '> ');
-    colorxy($1f, 2, kScrH-1, cmdstr);
-    colorxy($1f, 2 + length(cmdstr), kScrH-1,
-      chntimes(' ', kScrW - 2 - length(cmdstr)));
-    gotoxy( 2 + curpos, kScrH-1 );
+    cw.cxy($1e, 0, kvm.MaxY, '> ');
+    cw.cxy($1f, 2, kvm.MaxY, cmdstr); clreol;
+    kvm.gotoxy( 2 + curpos, kvm.MaxY );
   end;
 
-destructor ShellObj.destroy;
+destructor ShellObj.Destroy;
   begin
     dispose(self.words, Destroy);
     vm^.alive := false;
     clock^.alive := false;
-    {inherited} ActorObj.Destroy;
+    inherited Destroy;
   end;
 
 {-- main program ---------}
@@ -701,32 +698,29 @@ var
 
 procedure Create;
   begin
-    InitEvents; HideMouse;
+    kvm.ClrScr;
     numActors := 0; numTokens := 0;
     focus := New(Shell, Create);
     Register(focus);
-    InitVideo; ClearScreen;
-    ShowMouse;
   end;
 
-function NextKeyEvent( var e : TEvent ):boolean;
-  begin
-    GetKeyEvent(e);
-    NextKeyEvent := e.what <> evNothing;
-  end;
 
 procedure Update;
-  var i : byte; e : TEvent; a : Actor; msg:Event;
+  var i : byte; ch : char; a : Actor; msg:Event;
   begin
-    if NextKeyEvent(e) then
-      case e.KeyCode of
-        kbEsc : halt;
+
+    // TODO: without this next line (at least on freebsd)
+    // it won't readkey. why not!?!
+    if not keypressed then sleep(50);
+
+    if keypressed then
+      case kbd.ReadKey(ch) of
+        #0 : case kbd.ReadKey(ch) of kbd.ESC : halt; end;
       else
-	msg := New(Event, Create(evt_keydn, e));
-	if not focus^.handle(msg) then
-	  pass; {-- todo global keymap --}
-	Dispose(msg, Destroy)
-      end;
+        msg := New(Event, Create(evt_keydn, ord(ch)));
+        if not focus^.handle(msg) then pass; {-- todo global keymap --}
+        Dispose(msg, Destroy)
+      end; { case }
 
     { dispatch to all actors }
     i := 0;
@@ -734,16 +728,16 @@ procedure Update;
       begin
         a := actors[ i ];
         if a^.active then begin
-	  a^.Update;
-	  if a^.alive then inc(i)
-	  else begin
-	    Dec(numActors);
-	    Dispose(a, Destroy);
-	    actors[ i ] := Actors[ numActors ];
-	    actors[ numActors ] := nil;
-	  end
-	end else inc(i) { was inactive, skip over for now }
-      end
+          a^.Update;
+          if a^.alive then inc(i)
+          else begin
+            Dec(numActors);
+            Dispose(a, Destroy);
+            actors[ i ] := Actors[ numActors ];
+            actors[ numActors ] := nil;
+          end
+        end else inc(i) { was inactive, skip over for now }
+      end;
   end;
 
 procedure Render;
@@ -756,9 +750,7 @@ procedure Render;
 
 procedure Destroy;
   begin
-    HideMouse;
-    DoneEvents;
-    DoneVideo;
+    clrscr; writeln('terminated cleanly.');
   end;
 
 begin
