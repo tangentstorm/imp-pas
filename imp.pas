@@ -16,7 +16,7 @@ interface {$I imp.def} implementation
 program imp;
 { }{$ENDIF}
 uses xpc, arrays, stacks, ascii, sysutils, strutils, num, variants,
-  math, lined;
+  math {$IFNDEF NOPROMPT}, lined{$ENDIF};
 
 procedure halt( msg : string );
   begin
@@ -209,7 +209,9 @@ function trace(step:string; e : TExpr) : boolean;
   var cmd: string;
   begin
     writeln( step, ':', ShowExpr(e));
-    lined.prompt('debug>', cmd);
+    {$IFDEF IMPSHELL} lined.prompt('debug>', cmd);
+    {$ELSE} readln(cmd);
+    {$ENDIF}
     if cmd = 'q' then halt('goodbye');
     result := true;
   end;
@@ -771,7 +773,7 @@ function mEVAL( e, a : TExpr ) : TExpr;
   function mEVCON( c, a : TExpr ) : TExpr;
     begin
       if exBool(mEVAL(mCAAR(c), a))
-	then result := mEVAL(mCADAR(c), a)
+        then result := mEVAL(mCADAR(c), a)
         else result := mEVCON(mCDR(c), a)
     end; { mEVCON }
 
@@ -814,18 +816,18 @@ function mEVAL( e, a : TExpr ) : TExpr;
         else begin
           x := mASSOC(h, a);
           case x.kind of
-	    kERR : r := x;
-	    kMF0 : r := metas[x.data].f0();
-	    kMF1 : r := metas[x.data].f1(mEVAL(mCADR(e), a));
-	    kMF2 : r := metas[x.data].f2(mEVAL(mCADR(e), a),
-					 mEVAL(mCADDR(e), a));
-	    kMF3 : r := metas[x.data].f3(mEVAL(mCADR(e), a),
-					 mEVAL(mCADDR(e), a),
-					 mEVAL(mCADDDR(e), a));
-	    kMF4 : r := metas[x.data].f4(mEVAL(mCADR(e), a),
-					 mEVAL(mCADDR(e), a),
-					 mEVAL(mCADDDR(e), a),
-					 mEVAL(mCADDDDR(e), a));
+            kERR : r := x;
+            kMF0 : r := metas[x.data].f0();
+            kMF1 : r := metas[x.data].f1(mEVAL(mCADR(e), a));
+            kMF2 : r := metas[x.data].f2(mEVAL(mCADR(e), a),
+                                         mEVAL(mCADDR(e), a));
+            kMF3 : r := metas[x.data].f3(mEVAL(mCADR(e), a),
+                                         mEVAL(mCADDR(e), a),
+                                         mEVAL(mCADDDR(e), a));
+            kMF4 : r := metas[x.data].f4(mEVAL(mCADR(e), a),
+                                         mEVAL(mCADDR(e), a),
+                                         mEVAL(mCADDDR(e), a),
+                                         mEVAL(mCADDDDR(e), a));
             else r := mEVAL(mCONS(x, mEVLIS(mCDR(e), a)), a)
           end
         end
@@ -951,9 +953,9 @@ var
   debugging : boolean = true;
   ShowFormat : TFormat = fmtLisp;
 var
-  line	 : string = '';
+  line   : string = '';
   lx, ly : cardinal;
-  done	 : boolean = false;
+  done   : boolean = false;
 
 function k2s( kind :  TKind ) : string;
   begin
@@ -997,7 +999,7 @@ function NextChar( var ch : char ) : char;
       {$NOTE compiling without prompt}
       {$ELSE}
       if length(nest) > 0
-	then ps := nest + prompt1
+        then ps := nest + prompt1
         else ps := prompt0;
       {$ENDIF}
       {$IFDEF NOPROMPT}
@@ -1008,14 +1010,16 @@ function NextChar( var ch : char ) : char;
         if depth > 0 then halt( 'unexpected end of file' );
         writeln;
         system.halt;
-      end else
-      {$ENDIF}
+      end else begin
+        readln(line);
+      {$ELSE}
       if lined.prompt(ps, line) then begin
-	writeln;
+      {$ENDIF}
+        writeln;
         line := line + ascii.LF; { so we can do proper lookahead. }
         inc( ly );
         lx := 0;
-      end else system.halt;
+      end {$IFNDEF NOPROMPT}else system.halt{$ENDIF};
     end;
   begin
     while lx + 1 > length( line ) do prompt;
@@ -1233,10 +1237,6 @@ procedure Shell;
   begin
     repeat Print(Eval(ReadNext(val)))
     until (val.kind = kERR)
-  end;
-
-procedure complete( const s : string; var comp : lined.Completions );
-  begin
   end;
 
 begin
