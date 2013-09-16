@@ -11,41 +11,13 @@ uses
 
 {-- dynamic types -----------------}
 type
-   Obj = ^BaseObj; { base type for all objects }
-  Atom = ^AtomObj; { atomic values }
-   Int = ^IntObj;  { holds a 32-bit integer }
-   Str = ^StrObj;  { a pascal string }
-                   { TODO : Txt = ^TxtObj; }
-  Cell = ^CellObj;
-
+  Obj = ^BaseObj; { base type for all objects }
   BaseObj = object
     constructor Create;
     function Str: string; virtual;
     destructor Destroy; virtual;
   end;
 
-  AtomObj = object(BaseObj)
-  end;
-
-  IntObj = object(AtomObj)
-    value : longint;
-    function Str: string; virtual; { override }
-  end;
-
-  StrObj = object(AtomObj)
-    value : string;
-    function Str: string; virtual; { override }
-  end;
-
-  CellObj = object(BaseObj)
-    head, tail : Obj;
-    constructor Create( headObj, tailObj : Obj );
-    function Str: string; virtual; { override }
-  end;
-
-var
-  null : Atom = nil;
-
 constructor BaseObj.Create;
   begin
   end;
@@ -57,32 +29,6 @@ function BaseObj.Str : string;
 
 destructor BaseObj.Destroy;
   begin
-  end;
-
-function IntObj.Str : string;
-  begin
-    Str := n2s( value );
-  end;
-
-function StrObj.Str : string;
-  begin
-    Str := value;
-  end;
-
-constructor CellObj.Create( headObj, tailObj : Obj );
-  begin
-    head := headObj;
-    tail := tailObj;
-    if head = nil then head := null;
-    if tail = nil then tail := null;
-  end;
-
-function CellObj.Str : string;
-  begin
-    result := '(' + head^.Str;
-    if pointer(tail) = pointer(null) then
-      AppendStr(result, ' ' + tail^.Str);
-    AppendStr(result, ')');
   end;
 
 {-- fixed-size data blocks --------}
