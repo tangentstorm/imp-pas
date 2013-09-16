@@ -1,0 +1,56 @@
+* NOTE . workers
+:PROPERTIES:
+:TS:       <2013-09-16 01:13AM>
+:ID:       wvh5exv0m8g0
+:END:
+00:48:05 tangentstorm workers are always in one of four states:
+00:48:15 tangentstorm 1. vo: the worker is doing its thing. leave it alone.
+00:48:29 tangentstorm 2. ru: the worker is waiting on an input symbol to tell it what to do next.
+00:48:42 tangentstorm 3. na: the worker has encountered some kind of error.
+00:48:52 tangentstorm 4. ti: the worker has finished successfully.
+00:49:16 darkf I really do not like when people make up particles like vo/ru/na/ti
+00:49:19 tangentstorm in python, a worker would probably be closer to an iterator
+00:49:20 darkf they are hard for me to remember
+00:49:35 tangentstorm they're mnemonic
+00:50:13 darkf at least make them three characters long
+00:50:25 tangentstorm well, just forget them for now then. the point is there are those four states.
+00:51:07 tangentstorm so now, if you want to parse something, you can create a worker/iterator/whatever for the input stream
+00:51:19 tangentstorm and it will yield one character at a time
+00:51:47 tangentstorm but if you want a backtracking parser, then you just give the input source a stack
+00:52:53 tangentstorm now it can respond to several messages: ( next token, push current location, go back to old location, quit )
+00:54:26 tangentstorm the parser has the exact same structure, but instead of an input string, it curses back and forth along a string of compiled
+                      instructions
+00:55:02 tangentstorm you can put a lexer between them if you like, and it would also have the exact same structure
+00:56:29 tangentstorm it has its own compiled parser instructions but also adds a list of tokens (which starts out empty)
+00:57:36 tangentstorm anyway, you connect them in a chain, and then you just keep sending 'step' messages to the top-level parser.
+00:58:22 tangentstorm optionally, it can send them to itself.
+00:59:35 tangentstorm these things would be connected by ports.
+01:00:10 tangentstorm each port is set up to support a particular protocol, which would be like an interface in java, except bidirectional.
+01:00:48 tangentstorm so like a list of messages that can be sent, and a list of messages that can be received
+01:01:45 tangentstorm a worker can support either side of a protocol, or both sides
+01:05:09 tangentstorm i kind of think maybe you couple all that with the command pattern, where each command/opcode supports an 'undo'
+01:05:15 tangentstorm for backtracking.
+01:05:35 tangentstorm which makes all this work a whole lot like prolog...
+01:05:49 tangentstorm anyway, that's all i've got. i'll stop rambling. ;)
+
+* 
+01:13:53 tangentstorm the interesting thing is that it generalizes control flow for things like exceptions and return values and whatever.
+01:14:06 darkf continuations do that too
+01:14:38 tangentstorm well, yeah... workers are basically continuations.
+01:15:21 tangentstorm so like here's the problem: there are two sort of primitive combinators when you're matching a grammar:   alt() and seq()
+01:16:03 tangentstorm seq is a sequence, where every item in the sequence must match the input.
+01:16:28 tangentstorm alt basically means there should be exactly one match.
+01:16:53 tangentstorm so in regular expression,   "a|b|c"  is alt   and    "abc"  is seq
+01:17:44 tangentstorm it would be nice if the emitted code could just be (match a, match b, match c) for each one
+01:18:00 tangentstorm and let the worker keep track of what state it's in
+01:19:32 tangentstorm so then if a match fails, the worker goes into the error state
+01:19:42 tangentstorm and then there would be a hook to cover that transition.
+01:20:57 tangentstorm so you could have a command like "end" that puts the thing in the "succesful termination" state.
+01:21:39 tangentstorm how it handled that would change based on the state it's currently in.
+01:21:49 tangentstorm so maybe it returns from a function, maybe it caps off a while loop, etc.
+01:22:35 tangentstorm but the behavior would be specific to the state it's already in.
+01:23:12 tangentstorm so in the error state, when it's backtracking, end would actually tell it to scan backwards until it can figure out what it's
+                      ending, and undo that.
+01:24:13 tangentstorm (or possibly the position of the top of the loop/function/whatever would be in the generated code and it would act sort of like a
+                      jump
+01:24:24 tangentstorm okay, now i'm done rambling. sorry for wall of text

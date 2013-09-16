@@ -1,0 +1,69 @@
+#+title: grammars in implish
+
+* TODO implementing workers
+** TODO pull in actor model from from retp.pas
+* TODO implement workers as worker/machine objects
+** NOTE The issue is we want to step the parser.
+** TODO implement a stepping protocol (probably vorunati)
+do at least enough to step.
+** TODO option: combinators create opcode structures immediately.
+** --rejected options--
+*** option: pre.pas style combinators, since i already have them
+**** simpler, but requires a pascal debugger if you want to inspect
+*** option: no combinators in pascal syntax. just use input files.
+*** option: combinators as enumerator objects (clockwork style)
+* TODO mapping syntax to the combinators
+** TODO implement a (read-file filename) routine to read from a file
+** TODO translate the pascal names to pretty ASCII symbols
+#+begin_src
+lang -> lang
+lexer -> apply 'token' to all children; must have rule '<S>'
+parser -> (apply 'node' def produce tokens) must have rule '<t>'
+
+def -> :
+alt -> |
+rng -> - "a" "z"
+any -> _ wildcard?
+lit -> string literal
+rep -> +
+opt -> ?
+orp -> *
+sep -> /
+nul -> ()
+lif -> ^
+cmd -> ...?
+seq -> list
+skip -> skip
+#+end_src
+
+* TODO given a grammar, implish can parse text directly /or/ generate a standalone parser program
+** TODO parsing text directly
+*** TODO the intepreter uses a virtual machine for easy debugging
+**** TODO parsers are general workers (vorunati automata)
+***** TODO workers are always in one of four primary states
+This type represents the effect of stepping the parser.
+
+: data workstate = ti:match | na:fail | ru:needchar | vo:working ;
+
+***** TODO workers have 0..n stacks
+***** TODO workers can have 0..n input/output queues
+***** TODO backtracking is built into the virtual machine
+***** TODO a worker's primary state changes with each instruction
+**** TODO the input source is a worker that waits in state ru
+pre.Source already basically provides this.
+we can add a stack if we want.
+
+*** TODO storing the grammars
+- grammars are stored as lists of implish values. (so [kind, int] pairs)
+- parser instances are workers (which are implish values as well)
+  
+** TODO generating standalone parsers
+** TODO generating a standalone pascal program
+
+* --- later ---
+** TODO generate bottom up parsers instead of top-down
+(faster, makes it easier to parse fragments)
+** TODO implement a text type with cursors (like oberon riders)
+** TODO implementing iterators / stack closures / continuations
+- each "thread" has an explicit stack
+** TODO allow stacks of workers, as in clockwork
