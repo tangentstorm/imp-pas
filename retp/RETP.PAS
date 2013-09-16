@@ -67,7 +67,7 @@ type
   ScreenBuff = ^ScreenData;
   ScreenData = array[ 0 .. (2 * kScrH * kScrW)-1 ] of byte;
 var
-  screen: ScreenData absolute $B800:$0000;
+  screen: ScreenData;// absolute $B800:$0000;
   view  : TView;  { to get cursor support and string drawing }
   drawto: ScreenBuff;
   buffln: TDrawBuffer;  { a single line of char+attr words }
@@ -86,13 +86,15 @@ procedure colorXY( c, x, y : byte; s : string);
 
 { use 16 background colors instead of blinking text }
 procedure blinking( b : boolean );
- begin
+  begin
+{$ifdef TURBO}
    asm
      mov ah,$10;
      mov al,$03;
      mov bl,b;
      int 10h;
    end
+{$ENDIF}
  end;
 
 {-- dynamic types -----------------}
@@ -297,7 +299,7 @@ type
     sender: Actor;
     args: Tuple;
   end;
-  
+
 
 constructor ActorObj.Create;
   begin
