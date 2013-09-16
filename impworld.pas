@@ -620,7 +620,10 @@ function ShellObj.Handle( msg : Message ) : boolean;
         case ch of
           ^C : halt;
           ^H : if length(cmdstr) > 0 then
-                  SetLength(cmdstr, length(cmdstr)-1)
+                 begin
+                   SetLength(cmdstr, length(cmdstr)-1);
+                   dec(curpos);
+                 end
                else pass;
           ^M : begin
                  self.Invoke(cmdstr); self.Clear
@@ -637,7 +640,7 @@ procedure ShellObj.Render;
   begin
     cw.cxy($1e, 0, kvm.MaxY, '> ');
     cw.cxy($1f, 2, kvm.MaxY, cmdstr); clreol;
-    kvm.gotoxy( 2 + curpos, kvm.MaxY );
+    kvm.gotoxy( 1 + curpos, kvm.MaxY );
   end;
 
 destructor ShellObj.Destroy;
