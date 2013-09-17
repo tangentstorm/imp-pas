@@ -28,12 +28,61 @@ type
     function Poll(out oval : O ) : boolean;
   end;
 
-  // TVoid is a dummy class to fill the Take or Give slot (or both)
+  // 'void' is a dummy class to fill the Take or Give slot (or both)
   // when the task doesn't need it. Since the constructor is abstract,
-  // you can't actually instantiate a TVoid.
-  TVoid = class
+  // you can't actually instantiate a 'void'.
+  void = class
     public constructor Create; virtual; abstract;
   end;
+
+{$IFDEF FUTURE}/////////////////////////////////////////////////
+type
+
+  // act a queue for values of type A
+  TFIFOVor<A> = class (TVorunati<A,A>)
+    constructor Create(src : IGive<A>; snk : ITake<A>);
+  end;
+
+  // a stack for values of type A
+  TLIFOVor<A>= class (TVorunati<A,A>)
+    constructor Create(src : IGive<A>; snk : ITake<A>);
+  end;
+
+  // wrap a normal function
+  TVorFunc<A,B>= class (TVorunati<A,B>)
+    type TFuncAB = function( aval : A ) : B;
+    constructor Create(f : TFuncAB);
+  end;
+
+  // wrap a normal procedure
+  TVorProc<A> = class (TVorunati<A,void>)
+    type TProcA = procedure( aval : A );
+    constructor Create(p : TProcA);
+  end;
+
+  // a TVorVar acts like a variable
+  TVorVar<V> = class (TVorunati<V,V>)
+  private
+    value : V;
+  public 
+    constructor Create(val : V);
+    function Poll(out val : V) : boolean; override;
+    function Send(val : V) : boolean; override;
+  end;
+
+  // a TVorConst acts like a constant
+  TVorConst<K> = class (TVorunati<void,K>)
+    value : K;
+    constructor Create(const val : K);
+    function Poll(out aval : K) : boolean; override;
+  end;
+
+  // A type that will compose two variables
+  TCompose<A,B,C> = class (TVorunati<A,C>)
+    constructor Create(ab : TVorunati<A,B>; bc : TVorunati<B,C>);
+  end;
+
+{$ENDIF}////////////////////////////////////////////////////////
 
 // TVorunati<I,O> is a default implementation of all three of the
 // above interfaces, intended to be used as a base class. It
