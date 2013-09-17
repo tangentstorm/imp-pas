@@ -209,8 +209,8 @@ function trace(step:string; e : TExpr) : boolean;
   var cmd: string;
   begin
     writeln( step, ':', ShowExpr(e));
-    {$IFDEF IMPSHELL} lined.prompt('debug>', cmd);
-    {$ELSE} readln(cmd);
+    {$IFDEF NOPROMPT} readln(cmd);
+    {$ELSE}  lined.prompt('debug>', cmd);
     {$ENDIF}
     if cmd = 'q' then halt('goodbye');
     result := true;
