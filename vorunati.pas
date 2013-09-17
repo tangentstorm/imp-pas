@@ -1,0 +1,95 @@
+{$mode delphi}
+unit vorunati;
+interface
+type
+  // A vorunati ('vor') value represents one of four possible
+  // states of a program's lifecycle.
+  vor = (
+    vo,     // vo : program is busy (mnemonic: 'void')
+    ru,     // ru : program needs input (to 'resolve uncertainty')
+    na,     // na : program encountered an error
+    ti );   // ti : program is terminated ("T is for terminate")
+  
+  // IVorTask represents a task in one of the four states.
+  IVorTask = interface
+    procedure Step;
+    procedure Run; // Take some steps. Perhaps until state <> vo.
+    function GetState : vor;
+    property state : vor read GetState;
+  end;
+
+  // ITake<I> allows an object to act as a sink for values of type I.
+  ITake<I> = interface
+    procedure Send( ival : I );
+  end;
+  
+  // IGive<O> allows an object to act as a source for values of type O.
+  IGive<O> = interface
+    function Poll(out oval : O ) : boolean;
+  end;
+
+  // TVoid is a dummy class to fill the Take or Give slot (or both)
+  // when the task doesn't need it. Since the constructor is abstract,
+  // you can't actually instantiate a TVoid.
+  TVoid = class
+    public constructor Create; virtual; abstract;
+  end;
+
+// TVorunati<I,O> is a default implementation of all three of the
+// above interfaces, intended to be used as a base class. It
+// ignores all I values sent to it, produces no O values when
+// polled, and terminates successfully after the first step.
+//
+// It is therefore equivalent to the program:
+//
+// begin
+// end.
+//
+type
+  TVorunati<I,O> = class (TInterfacedObject, IVorTask, ITake<I>, IGive<O>)
+  private
+    _state : vor;
+  public
+    constructor Create;
+    function GetState : vor; virtual;
+    function Poll(out oval : O ) : boolean; virtual;
+    procedure Send( ival : I ); virtual;
+    procedure Step; virtual;
+    procedure Run; virtual; // default version steps while state = vo.
+  end;
+
+implementation
+
+{-- default implementation: a worker that halts immediately --}
+
+constructor TVorunati<I,O>.Create;
+  begin
+    _state := vo { all processes start in the vo state }
+  end;
+
+function TVorunati<I,O>.GetState : vor;
+  begin
+    result := _state
+  end;
+
+function TVorunati<I,O>.Poll( out oval : O) : boolean;
+  begin
+    result := false
+  end;
+
+procedure TVorunati<I,O>.Send( ival : I );
+  begin
+  end;
+
+procedure TVorunati<I,O>.Step;
+  begin
+    _state := ti // default implementation terminates immediately
+  end;
+
+procedure TVorunati<I,O>.Run;
+  begin
+    while _state = vo do Step
+  end;
+
+initialization
+end.
