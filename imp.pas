@@ -170,8 +170,10 @@ var
 // a unique symbol for it.
 function NextMeta( a : TArity; p : pointer ) : TExpr;
   begin
-    with metas[metacount] do
-      begin
+    if metacount = high(metas) then
+      halt( 'out of meta slots.' )
+    else begin
+      with metas[metacount] do begin
         arity := a;
         case arity of
           0: f0 := TMetaFun0(p);
@@ -181,25 +183,25 @@ function NextMeta( a : TArity; p : pointer ) : TExpr;
           4: f4 := TMetaFun4(p);
         end
       end;
-    if metacount > high(metas) then halt( 'out of meta slots.' );
-    result := Sx(aritykind[a], metacount);
-    inc(metacount);
+      result := Sx(aritykind[a], metacount);
+      inc(metacount);
+    end
   end;
 
 function Meta( f : TMetaFun0 ) : TExpr; overload;
-  begin NextMeta(0, f) end;
+  begin result := NextMeta(0, f) end;
 
 function Meta( f : TMetaFun1 ) : TExpr; overload;
-  begin NextMeta(1, f) end;
+  begin result := NextMeta(1, f) end;
 
 function Meta( f : TMetaFun2 ) : TExpr; overload;
-  begin NextMeta(2, f) end;
+  begin result := NextMeta(2, f) end;
 
 function Meta( f : TMetaFun3 ) : TExpr; overload;
-  begin NextMeta(3, f) end;
+  begin result := NextMeta(3, f) end;
 
 function Meta( f : TMetaFun4 ) : TExpr; overload;
-  begin NextMeta(4, f) end;
+  begin result := NextMeta(4, f) end;
 
 // We will populate this table in section e2.
 
@@ -323,10 +325,14 @@ function mEQP( x, y : TExpr ) : TExpr;
 
 // 1. ff[x] -> first atomic symbol in f, ignoring parentheses.
 // Perhaps this is an abbreviation for "find first".
+// Note: this works but it's not necessary for mEVAL, so I
+// don't include it in the binary.
+{
 function mFF( x : TExpr ) : TExpr;
   begin
     if mATOM(x) then result := x else result := mFF(mCAR(x))
   end;
+}
 
 // 2. subst[x;y;z] -> copy z, replacing each occurrence of y with x.
 function mSUBST( x, y, z : TExpr ) : TExpr;
@@ -588,14 +594,14 @@ procedure CreateSpecials;
 {$IFDEF IMPSHELL}
 var
   // the functions we've defined so far:
-  sAtomP, sEqP, sCar, sCdr, sCons, sFF, sSubst, sEqualP, sNullP,
+  sAtomP, sEqP, sCar, sCdr, sCons, sSubst, sEqualP, sNullP,
   sCaar, sCadr, sCadar, sCaddr, sAppend, sAmongP, sZip,
   sAssoc, sSublis,
 
   // and now the ones we'll define later ...
   sApply, sEval, sAppq,
   sList, sMapList, sSearch, sFilter, sReduce,
-  sAdd, sSub, sMul, sDiv, sMod, sLog, sDif : TExpr;
+  sAdd, sSub, sMul, sDiv, sMod : TExpr;
 {$ENDIF}
 { }{$IFDEF IMPSHELL}
   // ... for which we also have to provide forward declarations,
@@ -616,8 +622,6 @@ var
   function mDIV ( x, y : TExpr ) : TExpr; forward;
   function mMOD ( x, y : TExpr ) : TExpr; forward;
   function mPOW ( x, y : TExpr ) : TExpr; forward;
-  function mLOG ( x, y : TExpr ) : TExpr; forward;
-  function mDIF ( x, y : TExpr ) : TExpr; forward;
 { }{$ENDIF}
 
 // We will also need a routine to bind names to their values at runtime,
@@ -649,7 +653,6 @@ procedure CreateBuiltins;
     sCar := Define('car', Meta(@mCAR));
     sCdr := Define('cdr', Meta(@mCDR));
     sCons := Define('cons', Meta(@mCONS));
-    sFF := Define('ff', Meta(@mFF));
     sSubst := Define('subst', Meta(@mSUBST));
     sEqualP := Define('equal', Meta(@mEQUAL));
     sNullP := Define('null?', Meta(@mNULLP));
@@ -675,8 +678,48 @@ procedure CreateBuiltins;
     sMul := Define('*', Meta(@mMUL));
     sDiv := Define('%', Meta(@mDIV));
     sMod := Define('|', Meta(@mMOD));
-    sLog := Define('log', Meta(@mLOG));
-    sDif := Define('dif', Meta(@mDIF));
+  end;
+
+
+// This next part is here both to provide some docs and to
+// suppress the 'variable assigned but never used' notes...
+procedure Doc(sym : TExpr; s : string );
+  begin
+    //  TODO! AddHelp(...)
+  end;
+
+procedure DescribeBuiltins;
+  begin
+    Doc(sAtomP , '(sym -> bool) is symbol an atom?');
+    Doc(sEqP, '(x y -> bool) are symbols x and y the same?');
+    Doc(sCar, '(x.y -> x) first item in list (or: left side of cell)');
+    Doc(sCdr, '(x.y -> y) list w/o first item (or: right side of cell)');
+    Doc(sCons, '(x y -> x.y) construct a cell from x and y');
+    Doc(sSubst, '(x y zz -> zz'') zz with each y replaced by x.');
+    Doc(sEqualP, '(xx yy -> bool) are the two lists equal?');
+    Doc(sNullP, '(x -> boolean) is x null?');
+    Doc(sCaar, '((x.y).z) -> x');
+    Doc(sCadr, '(x.(y.z)) -> y');
+    Doc(sCadar, '((w.(x.y)).z) -> x');
+    Doc(sCaddr, '(w.(x.(y.z))) -> y');
+    Doc(sAppend, 'xx yy -> xxyy | create a copy of xx with yy appended');
+    Doc(sAmongP, 'list x -> bool | is x in the list?');
+    Doc(sZip, 'xx yy -> x0y0 x1y1.. | list of list of paired members');
+    Doc(sAssoc, 'k a -> v | value for key in a = ((k0,v0) (k1,v1) ...)');
+    Doc(sSublis, 'x y -> subst uN->vN in y; x=((u0,v0), (u1,v1)...)');
+    Doc(sApply, 'f args -> f(args)');
+    Doc(sEval, 'evaluate the given expression');
+    Doc(sAppq, 'xyz -> ''x ''y ''z | quote each item in the list');
+    Doc(sList, 'evaluate each argument and return a list of the results');
+    Doc(sMapList, 'TODO');
+    Doc(sSearch, 'TODO');
+    Doc(sFilter, 'TODO');
+    Doc(sReduce, 'TODO');
+    Doc(sAdd, 'x y -> x + y');
+    Doc(sSub, 'x y -> x - y');
+    Doc(sMul, 'x y -> x * y');
+    Doc(sDiv, 'x y -> x div y');
+    Doc(sMod, 'x y -> x mod y');
   end;
 
 // That's it for rule 2 for meta->symbolic translation.
@@ -855,26 +898,30 @@ function mBIND( iden, value : TExpr ) : TExpr;
 
 function mLIST ( x : TExpr ) : TExpr;
   begin
+    result := sNULL
   end;
 
 //-- g. higher order functions ---------------------------------
 
 function mMAPLIST( f, x : TExpr ) : TExpr;
   begin
+    result := sNULL
   end;
 
 function mSEARCH( f, x : TExpr ) : TExpr;
   begin
+    result := sNULL
   end;
 
 function mFILTER( f, x : TExpr ) : TExpr;
   begin
+    result := sNULL
   end;
 
 function mREDUCE( f, x, y : TExpr ) : TExpr;
   begin
+    result := sNULL
   end;
-
 
 //-- arithmetic  -----------------------------------------------
 
@@ -919,14 +966,6 @@ function mPOW( x, y : TExpr ) : TExpr;
     if ints(x,y,result) then result := Nx(x.data ** y.data)
   end;
 
-function mLOG( x, y : TExpr ) : TExpr;
-  begin
-  end;
-
-function mDIF( x, y : TExpr ) : TExpr;
-  begin
-  end;
-
 // - functions - - - - - - - - - - - - - - - - - - - - - - - - -
 type
   TBind = record // name bindings.
@@ -955,7 +994,6 @@ var
 var
   line   : string = '';
   lx, ly : cardinal;
-  done   : boolean = false;
 
 function k2s( kind :  TKind ) : string;
   begin
