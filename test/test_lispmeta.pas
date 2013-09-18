@@ -107,4 +107,9 @@ procedure test_sym2chars;
     cev('(b a n a n a)', L(sSym2Chars, q(Sym('banana'))));
   end;
 
+procedure test_chars2Sym;
+  begin
+    cev('banana', L(sChars2Sym, L(sSym2Chars, q(Sym('banana')))));
+  end;
+
 end.

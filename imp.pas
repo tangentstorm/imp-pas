@@ -1510,8 +1510,15 @@ function mSYM2CHARS ( x : TExpr ) : TExpr;
   end; { mSYM2CHARS }
 
 function mCHARS2SYM ( chars : TExpr ) : TExpr;
+  var s : string; x, bad : TExpr;
   begin
-    result := sNULL
+    bad := sNULL;
+    for x in chars do begin
+      if x.kind = kSYM then AppendStr(s, syms[x.data])
+      else begin bad := x; break end; // :(
+    end;
+    if bad.kind = kNUL then result := Sym(s)
+    else result := Err('chars->sym: invalid char:' + ShowExpr(bad))
   end; { mCHARS2SYM }
 
 begin
