@@ -61,9 +61,9 @@ type
     kMF4); // a meta-function (a,b,c,d:TExpr -> TExpr)
 
   TExpr = record
-            kind : TKind;
-            data : integer;
-          end;
+    kind : TKind;
+    data : integer;
+  end;
 {$ENDIF}
 
 { }{$IFDEF IMPSHELL}
@@ -466,6 +466,52 @@ function L( a, b, c, d, e, f, g, h, i : TExpr ) : TExpr; inline;
 function L( a, b, c, d, e, f, g, h, i, j : TExpr ) : TExpr; inline;
   begin result := mCONS(a, L(b, c, d, e, f, g, h, i, j)) end;
 
+// - list enumerator - - - - - - - - - - - - - - - - - - - - - -
+
+// "for x in exprs.." syntax for TExpr values.
+{$IFDEF IMPSHELL}
+type TExprEnumerator = class
+  private
+    head, cell : TExpr;
+    onFirst : boolean;
+    function GetCurrent : TExpr;
+  public
+    property Current : TExpr read GetCurrent;
+    constructor Create(const x: TExpr);
+    function MoveNext: boolean;
+  end;
+{$ENDIF}
+
+constructor TExprEnumerator.Create(const x:TExpr);
+  begin
+    if x.kind in [kNUL, kCEL] then
+      begin
+        self.onFirst := true;
+        self.head := x
+      end
+    else raise Exception.Create('not a list')
+  end;
+
+function TExprEnumerator.GetCurrent : TExpr;
+  begin
+    result := mCAR(self.cell)
+  end;
+
+function TExprEnumerator.MoveNext: boolean;
+  begin
+    if self.onFirst then
+      begin
+        self.cell := self.head;
+        self.onFirst := false
+      end
+    else self.cell := mCDR(self.cell);
+    result := self.cell.kind = kCEL;
+  end;
+
+operator Enumerator(const x: TExpr): TExprEnumerator;
+  begin
+    result := TExprEnumerator.Create(x)
+  end;
 
 // - functions - - - - - - - - - - - - - - - - - - - - - - - - -
 
