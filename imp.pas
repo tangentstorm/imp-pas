@@ -16,7 +16,7 @@ interface {$I imp.def} implementation
 program imp;
 { }{$ENDIF}
 uses xpc, arrays, stacks, ascii, sysutils, strutils, num, variants,
-  math {$IFNDEF NOPROMPT}, lined{$ENDIF};
+  math {$IFNDEF NOPROMPT}, cx, lined{$ENDIF};
 
 procedure halt( msg : string );
   begin
@@ -49,7 +49,8 @@ type
   TKind = (
     kSYM,  // an symbol or 'atom', represented internally by a string
     kNUL,  // NULL, a special symbol. Represents false and the empty list.
-    kERR,  // used to mark represent error conditions
+    kERR,  // used to represent error conditions
+    kEOF,  // end of file marker
     kSTR,  // alternate symbol syntax with quotes to allow spaces
     kINT,  // an integer
     kCEL,  // a 'cons cell' (pair of sybols)
@@ -1013,9 +1014,6 @@ type
   TDefTbl = specialize arrays.GArray<TBind>;
 
 var
-  ch   : char = #0;
-  nest : string = '';
-
   defs : TDefTbl;
 const
   whitespace  = [#0..' '];
@@ -1029,9 +1027,6 @@ type
 var
   debugging : boolean = true;
   ShowFormat : TFormat = fmtLisp;
-var
-  line   : string = '';
-  lx, ly : cardinal;
 
 function k2s( kind :  TKind ) : string;
   begin
@@ -1055,59 +1050,97 @@ procedure debug( msg : string ); inline;
 
 //== read part =================================================
 
-procedure syntaxerror( const err: string );
+type
+  TStrGen = function(out s : string) : boolean is nested;
+  TImplishReader = class
+  private
+    ch	 : char;
+    line : string;
+    nest : string;
+    atEOF : boolean;
+    lx, ly : cardinal;
+    getLine : TStrGen;
+    procedure SyntaxError(const err : string);
+    function  Depth : cardinal;
+    function NextChar(var _ch :  char ) : char;
+    function IsNum( s : string; out num : integer ) : boolean;
+    function ReadAtom : TExpr;
+    function ReadString : TExpr;
+    procedure HandleDirective;
+    procedure SkipCommentsAndWhitespace;
+    function ReadListEnd : TExpr;
+  public
+    constructor Create( gen : TStrGen );
+    function NextExpr( out value : TExpr ): TExpr;
+  end;
+
+constructor TImplishReader.Create( gen : TStrGen );
+  begin
+    ch :=  #0; nest := ''; getLine := gen; atEOF := false;
+  end; { TImplishReader.Create }
+
+procedure TImplishReader.SyntaxError( const err: string );
   begin
     writeln( '=== syntax error at line ', ly, ', column ', lx, ': ===' );
     halt( err );
-  end; { error }
+  end; { TImplishReader.SyntaxError }
 
-function Depth : cardinal;
+function TImplishReader.Depth : cardinal;
   begin
     result := Length(nest);
+  end; { TImplishReader.Depth }
+
+  var ps : string; // TODO: clean this prompt mess up!!
+function prompt( out line : string ) : boolean;
+  begin
+    result := true;
+    {$IFDEF NOPROMPT}
+    if eof then result := false;
+    else begin readln(line);
+    {$ELSE}
+      if lined.prompt(ps, line) then begin
+    {$ENDIF}
+	writeln;
+	line := line + ascii.LF; { so we can do proper lookahead. }
+      end
+    {$IFNDEF NOPROMPT}else
+        begin
+	  result := false;
+	  system.halt;
+	end
+    {$ENDIF}
   end;
 
-function NextChar( var ch : char ) : char;
-  procedure prompt;
-    var ps : string; // prompt string
-    begin
-      { write the prompt first, because eof() blocks. }
+type EndOfFile = class (Exception) end;
+function TImplishReader.NextChar( var _ch : char ) : char;
+  begin
+    result := #0;
+    while lx + 1 > length( line ) do begin
+      if self.atEOF then raise EndOfFile.Create('');
       {$IFDEF NOPROMPT}
+      ps := '';
       {$NOTE compiling without prompt}
       {$ELSE}
-      if length(nest) > 0
+      if depth > 0
         then ps := nest + prompt1
         else ps := prompt0;
       {$ENDIF}
-      {$IFDEF NOPROMPT}
-      if eof then begin
-        ch := ascii.EOT;
-        line := ch;
-        done := true;
-        if depth > 0 then halt( 'unexpected end of file' );
-        writeln;
-        system.halt;
-      end else begin
-        readln(line);
-      {$ELSE}
-      if lined.prompt(ps, line) then begin
-      {$ENDIF}
-        writeln;
-        line := line + ascii.LF; { so we can do proper lookahead. }
-        inc( ly );
-        lx := 0;
-      end {$IFNDEF NOPROMPT}else system.halt{$ENDIF};
+      if self.getLine(self.line) then
+	begin
+	  lx := 0; inc(ly);
+	  AppendStr(self.line, ascii.lf);
+	end
+      else self.atEOF := true
     end;
-  begin
-    while lx + 1 > length( line ) do prompt;
     inc( lx );
-    ch := line[ lx ];
+    result := self.line[ lx ];
     // debug( '[ line ' + n2s( ly ) +
-    //        ', column ' + n2s( lx ) + ' : ' +  ch + ']' );
-    result := ch;
-  end; { NextChar( ch ) }
+    //       ', column ' + n2s( lx ) + ' : ' +  result + ']' );
+    _ch := result;
+  end; { TImplishReader.NextChar }
 
 // this recognizes decimal integers.
-function IsNum( s : string; out num : integer ) : boolean;
+function TImplishReader.IsNum( s : string; out num : integer ) : boolean;
   var i : cardinal = 1; negate : boolean = false;
   begin
     result := true; num := 0;
@@ -1119,16 +1152,16 @@ function IsNum( s : string; out num : integer ) : boolean;
       Inc(i);
     end;
     if result and negate then num := -num;
-  end;
+  end; { TImplishReader.IsNum }
 
-function ReadAtom : TExpr;
+function TImplishReader.ReadAtom : TExpr;
   var tok : string = ''; i : integer;
   begin
     repeat tok := tok + ch until NextChar(ch) in stopchars;
     if IsNum( tok, i )
       then result := Sx( kINT, i )
       else result := Sx( kSYM, Key( tok ))
-  end;
+  end; { TImplishReader.ReadAtom }
 
 function PopChar( var s : string ) : char;
   var last : integer; ch : char;
@@ -1137,9 +1170,9 @@ function PopChar( var s : string ) : char;
     if last = 0 then ch := #0 else ch := s[ last ];
     SetLength( s, last - 1 );
     result := ch;
-  end;
+  end; { PopChar }
 
-function ReadString : TExpr;
+function TImplishReader.ReadString : TExpr;
   var s : string = '';
   begin
     AppendStr(nest, '"');
@@ -1154,28 +1187,33 @@ function ReadString : TExpr;
       else s := s + ch;
     PopChar(nest); NextChar(ch);
     result := Sx(kSTR, Key(s))
-  end;
+  end; { TImplishReader.ReadString }
 
-procedure HandleDirective;
+procedure TImplishReader.HandleDirective;
   var s : string = '';
   begin
     while ch <> ascii.LF do s += NextChar(ch);
     if AnsiStartsStr('fmt:struct', s) then showFormat := fmtStruct;
-  end;
+  end; { TImplishReader.HandleDirective }
 
-procedure SkipCommentsAndWhitespace;
+procedure TImplishReader.SkipCommentsAndWhitespace;
   begin
-    while ch in whitespace do
+    //writeln('1: ord(ch):', ord(ch), '... atEOF: ', atEOF);
+    while (ch in whitespace) and not atEOF do begin
       if NextChar(ch) = commentChar then
         if NextChar(ch) = '%' then HandleDirective
-        else while ch <> ascii.LF do NextChar(ch);
-  end;
+	else while (ch <> ascii.LF) and not atEOF do
+          begin
+	    //writeln('2: ord(ch):', ord(ch), '... atEOF?', atEOF);
+	    NextChar(ch);
+	  end;
+    end
+  end; { TImplishReader.SkipCommentsAndWhitespace }
 
-function ReadListEnd : TExpr;
+function TImplishReader.ReadListEnd : TExpr;
   var expect : char;
   begin
-    if Length(nest) = 0 then
-      result := Sx(kERR, Key('Unexpected char: ' + ch))
+    if depth = 0 then result := Err('Unexpected char: ' + ch)
     else begin
       case PopChar(nest) of
         '{' : expect := '}';
@@ -1184,13 +1222,13 @@ function ReadListEnd : TExpr;
         else expect := '?' // should never happen
       end;
       if ch = expect then result := sNULL
-      else result := Sx(kERR, Key('List end mismatch. Expected: '
-                                  + expect + ', got: ' + ch));
+      else result := Err('List end mismatch. Expected: '
+			 + expect + ', got: ' + ch);
     end;
     NextChar(ch);
-  end; { ReadListEnd }
+  end; { TImplishReader.ReadListEnd }
 
-function ReadNext( out value : TExpr ): TExpr;
+function TImplishReader.NextExpr( out value : TExpr ): TExpr;
 
   function ReadList( out res : TExpr; AtHead : boolean) : TExpr;
     var car, cdr : TExpr;
@@ -1201,7 +1239,7 @@ function ReadNext( out value : TExpr ): TExpr;
         begin
           res := sNULL; NextChar(ch);
         end
-      else if ReadNext(car).kind = kERR then res := car
+      else if NextExpr(car).kind = kERR then res := car
       else if ReadList(cdr, false).kind = kERR then res := cdr
       else res := MCons(car, cdr);
       if AtHead then PopChar(nest);
@@ -1212,21 +1250,30 @@ function ReadNext( out value : TExpr ): TExpr;
   function ReadQuote : TExpr;
     begin
       NextChar(ch);
-      if ReadNext(result).kind <> kERR
+      if NextExpr(result).kind <> kERR
       then result := q(result)
     end; { ReadQuote }
 
   begin
-    SkipCommentsAndWhitespace;
-    case ch of
-      '(','[','{' : ReadList(result, true);
-      ')',']','}' : result := ReadListEnd;
-      '"'         : result := ReadString;
-      ''''        : result := ReadQuote;
-      else result := ReadAtom;
+    try
+      //if atEOF then raise EndOfFile.Create('');
+      //writeln('skipping comments...');
+      SkipCommentsAndWhitespace;
+      //writeln('reading. ch=', ch);
+      case ch of
+	'(','[','{' : ReadList(result, true);
+	')',']','}' : result := ReadListEnd;
+	'"'	    : result := ReadString;
+	''''	    : result := ReadQuote;
+	else result := ReadAtom;
+      end
+    except
+      on EndOfFile do
+	if depth > 0 then result := Err('unexpected end of file!')
+	else result := Sx(kEOF, 0)
     end;
     value := result;
-  end; { ReadNext }
+  end; { TImplishReader.NextExpr }
 
 //== eval part =================================================
 // The evaluator applies functions that are in the car of a cell
@@ -1309,23 +1356,54 @@ procedure Print( expr : TExpr );
   end;
 
 procedure Shell;
-  var val : TExpr;
+  var val : TExpr; reader : TImplishReader;
   begin
-    repeat Print(Eval(ReadNext(val)))
-    until (val.kind = kERR)
+    reader := TImplishReader.Create(@prompt);
+    repeat Print(Eval(reader.NextExpr(val)))
+    until val.kind in [kERR, kEOF];
+    reader.Free;
   end;
 
 {-- support routines for parser stuff --}
 
+type TExprStack = specialize GStack<TExpr>;
+
 function ReadFile( path : string ) : TExpr;
-  var s : string; f : text; x : TExpr;
-  begin
-    Assign(f, path);
-    Reset(f);
-    while ReadNext(f, x) do begin
+  var
+    f  : text;
+    r  : TImplishReader;
+    x  : TExpr;
+    xs : TExprStack;
+  function NextLine( out line : string ): boolean;
+    begin
+      if Eof(f) then result := false
+      else begin
+	result := true;
+	ReadLn(f, line);
+	// write('nextline: "', line);
+      end;
+      // if not result then raise Exception.Create('for stack trace');
     end;
+  begin
+    Assign(f, path); Reset(f);
+    r := TImplishReader.Create( @NextLine );
+    xs := TExprStack.Create(1024);
+    while not (r.NextExpr( x ).kind in [kERR, kEOF]) do begin
+      // debug('expr from file: ' + ShowExpr(x));
+      xs.push(x);
+    end;
+    if x.kind = kERR then result := x
+    else begin
+      result := sNULL;
+      while xs.count > 0 do begin
+	result := mCONS( xs.pop, result );
+      end;
+    end;
+    xs.Free;
+    r.Free;
     CloseFile(f);
-  end;
+    // debug('ReadFile result:' + ShowExpr(result));
+  end; { ReadFile }
 
 function mREADFILE  ( path : TExpr ) : TExpr;
   begin
