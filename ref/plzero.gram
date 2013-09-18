@@ -5,7 +5,7 @@
       (: Digit (- "0" "9"))
       (: IDENT alpha (+ Alpha Digit))
       (: NUMBER (+ Digit)) )
-   (grammar
+   (rules
       (: program
          block "." )
       (: block 
