@@ -35,6 +35,29 @@ type
     public constructor Create; virtual; abstract;
   end;
 
+// TVorunati<I,O> is a default implementation of all three of the
+// above interfaces, intended to be used as a base class. It
+// ignores all I values sent to it, produces no O values when
+// polled, and terminates successfully after the first step.
+//
+// It is therefore equivalent to the program:
+//
+// begin
+// end.
+//
+type
+  TVorunati<I,O> = class (TInterfacedObject, IVorTask, ITake<I>, IGive<O>)
+  private
+    _state : vor;
+  public
+    constructor Create;
+    function GetState : vor; virtual;
+    function Poll(out oval : O ) : boolean; virtual;
+    procedure Send( ival : I ); virtual;
+    procedure Step; virtual;
+    procedure Run; virtual; // default version steps while state = vo.
+  end;
+
 {$IFDEF FUTURE}/////////////////////////////////////////////////
 type
 
@@ -83,30 +106,7 @@ type
   end;
 
 {$ENDIF}////////////////////////////////////////////////////////
-
-// TVorunati<I,O> is a default implementation of all three of the
-// above interfaces, intended to be used as a base class. It
-// ignores all I values sent to it, produces no O values when
-// polled, and terminates successfully after the first step.
-//
-// It is therefore equivalent to the program:
-//
-// begin
-// end.
-//
-type
-  TVorunati<I,O> = class (TInterfacedObject, IVorTask, ITake<I>, IGive<O>)
-  private
-    _state : vor;
-  public
-    constructor Create;
-    function GetState : vor; virtual;
-    function Poll(out oval : O ) : boolean; virtual;
-    procedure Send( ival : I ); virtual;
-    procedure Step; virtual;
-    procedure Run; virtual; // default version steps while state = vo.
-  end;
-
+  
 implementation
 
 {-- default implementation: a worker that halts immediately --}
@@ -139,6 +139,7 @@ procedure TVorunati<I,O>.Run;
   begin
     while _state = vo do Step
   end;
-
+   
+  
 initialization
 end.
