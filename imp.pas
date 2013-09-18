@@ -635,7 +635,7 @@ var
   function mLEN       ( a : TExpr ) : TExpr; forward;
   function mPUSH      ( a, x : TExpr ) : TExpr; forward;
   function mPOP       ( a, x : TExpr ) : TExpr; forward;
-  function mSYM2CHARS ( sym : TExpr ) : TExpr; forward;
+  function mSYM2CHARS ( x : TExpr ) : TExpr; forward;
   function mCHARS2SYM ( chars : TExpr ) : TExpr; forward;
 { }{$ENDIF}
 
@@ -1447,9 +1447,20 @@ function mPOP ( a, x : TExpr ) : TExpr;
     result := sNULL
   end; { mPOP }
 
-function mSYM2CHARS ( sym : TExpr ) : TExpr;
+// ! sym2chars is almost exactly the same as VL()
+// ... worth it to consolidate with a template / generic?
+function mSYM2CHARS ( x : TExpr ) : TExpr;
+  var i : cardinal; s : string;
   begin
-    result := sNULL
+    if x.kind = kERR then result := x
+    else if x.kind in [kSTR, kSYM] then
+      begin
+        result := sNULL; s := syms[x.data];
+	for i := length(s) downto 1 do
+	  result := mCONS(Sym(s[i]), result)
+      end
+    else result := Err('sym->chars: expected symbol, got ' +
+		       k2s(x.kind))
   end; { mSYM2CHARS }
 
 function mCHARS2SYM ( chars : TExpr ) : TExpr;

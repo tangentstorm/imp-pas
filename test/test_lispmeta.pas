@@ -102,4 +102,9 @@ procedure test_arithmetic;
     cev('9', L(Vx('*'), Nx(3), VL(['+', 1, 2 ])));
   end;
 
+procedure test_sym2chars;
+  begin
+    cev('(b a n a n a)', L(sSym2Chars, q(Sym('banana'))));
+  end;
+
 end.
