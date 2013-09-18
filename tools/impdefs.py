@@ -14,5 +14,6 @@ for line in open("imp.pas"):
         if rxEndBlock.match(line): inBlock = False
         else: print(line)
     elif rxDefn.match(line):
-        print(line.replace('forward;',''))
+        if line.count('.') : pass
+        else: print(line.replace('forward;',''))
     elif rxNewBlock.match(line): inBlock = True

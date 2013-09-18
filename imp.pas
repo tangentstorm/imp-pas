@@ -328,12 +328,10 @@ function mEQP( x, y : TExpr ) : TExpr;
 // Perhaps this is an abbreviation for "find first".
 // Note: this works but it's not necessary for mEVAL, so I
 // don't include it in the binary.
-{
-function mFF( x : TExpr ) : TExpr;
+{ function mFF( x : TExpr ) : TExpr;
   begin
     if mATOM(x) then result := x else result := mFF(mCAR(x))
-  end;
-}
+  end; }
 
 // 2. subst[x;y;z] -> copy z, replacing each occurrence of y with x.
 function mSUBST( x, y, z : TExpr ) : TExpr;
@@ -1049,7 +1047,7 @@ procedure debug( msg : string ); inline;
   end;
 
 //== read part =================================================
-
+{$IFDEF IMPSHELL}
 type
   TStrGen = function(out s : string) : boolean is nested;
   TImplishReader = class
@@ -1073,6 +1071,7 @@ type
     constructor Create( gen : TStrGen );
     function NextExpr( out value : TExpr ): TExpr;
   end;
+{$ENDIF}
 
 constructor TImplishReader.Create( gen : TStrGen );
   begin
