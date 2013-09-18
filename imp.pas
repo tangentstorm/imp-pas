@@ -601,7 +601,12 @@ var
   // and now the ones we'll define later ...
   sApply, sEval, sAppq,
   sList, sMapList, sSearch, sFilter, sReduce,
-  sAdd, sSub, sMul, sDiv, sMod : TExpr;
+  sAdd, sSub, sMul, sDiv, sMod, sPow,
+  sReadFile, sWriteFile, sBinRead, sBinWrite,
+  sArray, sLen, sPush, sPop,
+  sSym2Chars, sChars2Sym
+  : TExpr;
+
 {$ENDIF}
 { }{$IFDEF IMPSHELL}
   // ... for which we also have to provide forward declarations,
@@ -622,6 +627,17 @@ var
   function mDIV ( x, y : TExpr ) : TExpr; forward;
   function mMOD ( x, y : TExpr ) : TExpr; forward;
   function mPOW ( x, y : TExpr ) : TExpr; forward;
+
+  function mREADFILE  ( path : TExpr ) : TExpr; forward;
+  function mWRITEFILE ( path, data : TExpr ) : TExpr; forward;
+  function mBINREAD   ( path : TExpr ) : TExpr; forward;
+  function mBINWRITE  ( path, data : TExpr ) : TExpr; forward;
+  function mARRAY     ( size : TExpr ) : TExpr; forward;
+  function mLEN       ( a : TExpr ) : TExpr; forward;
+  function mPUSH      ( a, x : TExpr ) : TExpr; forward;
+  function mPOP       ( a, x : TExpr ) : TExpr; forward;
+  function mSYM2CHARS ( sym : TExpr ) : TExpr; forward;
+  function mCHARS2SYM ( chars : TExpr ) : TExpr; forward;
 { }{$ENDIF}
 
 // We will also need a routine to bind names to their values at runtime,
@@ -678,6 +694,17 @@ procedure CreateBuiltins;
     sMul := Define('*', Meta(@mMUL));
     sDiv := Define('%', Meta(@mDIV));
     sMod := Define('|', Meta(@mMOD));
+    sPow := Define('**', Meta(@mPOW));
+    sReadFile := Define('read-file', Meta(@mREADFILE));
+    sWriteFile := Define('write-file', Meta(@mWRITEFILE));
+    sBinRead := Define('bin-read', Meta(@mBINREAD));
+    sBinWrite := Define('bin-write', Meta(@mBINWRITE));
+    sArray := Define('array', Meta(@mARRAY));
+    sLen := Define('len', Meta(@mLEN));
+    sPush := Define('push', Meta(@mPUSH));
+    sPop := Define('pop', Meta(@mPOP));
+    sSym2Chars := Define('sym->chars', Meta(@mSYM2CHARS));
+    sChars2Sym := Define('chars->sym', Meta(@mCHARS2SYM));
   end;
 
 
@@ -720,6 +747,17 @@ procedure DescribeBuiltins;
     Doc(sMul, 'x y -> x * y');
     Doc(sDiv, 'x y -> x div y');
     Doc(sMod, 'x y -> x mod y');
+    Doc(sPOW, 'x y -> x ** y');
+    Doc(sReadFile, 'path -> list | read file as list of expressions');
+    Doc(sWriteFile, 'path list -> | write list to file');
+    Doc(sBinRead, 'path -> array | read array of bytes');
+    Doc(sBinWrite, 'path array -> | write array to file as bytes');
+    Doc(sArray, 'length -> array | create a new array');
+    Doc(sLen, 'array -> int | length of the array');
+    Doc(sPush, 'array int -> int | add item end of the array');
+    Doc(sPop, 'array -> int | remove last item from the array');
+    Doc(sSym2Chars, 'sym -> [char] | symbol as list of characters');
+    Doc(sChars2Sym, '[char] -> sym | symbol from given characters');
   end;
 
 // That's it for rule 2 for meta->symbolic translation.
@@ -1276,6 +1314,71 @@ procedure Shell;
     repeat Print(Eval(ReadNext(val)))
     until (val.kind = kERR)
   end;
+
+{-- support routines for parser stuff --}
+
+function ReadFile( path : string ) : TExpr;
+  var s : string; f : text; x : TExpr;
+  begin
+    Assign(f, path);
+    Reset(f);
+    while ReadNext(f, x) do begin
+    end;
+    CloseFile(f);
+  end;
+
+function mREADFILE  ( path : TExpr ) : TExpr;
+  begin
+    if path.kind in [kSYM, kSTR]
+      then result := ReadFile(syms[path.data])
+      else result := Err('READFILE: expected filename, got: '
+			 + ShowExpr(path))
+  end; { mREADFILE }
+
+function mWRITEFILE ( path, data : TExpr ) : TExpr;
+  begin
+    result := sNULL
+  end; { mWRITEFILE }
+
+function mBINREAD   ( path : TExpr ) : TExpr;
+  begin
+    result := sNULL
+  end; { mBINREAD }
+
+function mBINWRITE  ( path, data : TExpr ) : TExpr;
+  begin
+    result := sNULL
+  end; { mBINWRITE }
+
+function mARRAY ( size : TExpr ) : TExpr;
+  begin
+    result := sNULL
+  end; { mARRAY }
+
+function mLEN ( a : TExpr ) : TExpr;
+  begin
+    result := sNULL
+  end; { mLEN }
+
+function mPUSH ( a, x : TExpr ) : TExpr;
+  begin
+    result := sNULL
+  end; { mPUSH }
+
+function mPOP ( a, x : TExpr ) : TExpr;
+  begin
+    result := sNULL
+  end; { mPOP }
+
+function mSYM2CHARS ( sym : TExpr ) : TExpr;
+  begin
+    result := sNULL
+  end; { mSYM2CHARS }
+
+function mCHARS2SYM ( chars : TExpr ) : TExpr;
+  begin
+    result := sNULL
+  end; { mCHARS2SYM }
 
 begin
   syms := TSymTbl.Create;
