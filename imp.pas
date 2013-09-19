@@ -23,7 +23,7 @@ procedure halt( msg : string );
     writeln( msg );
     system.halt(-1);
   end;
-
+
 //== meta model ================================================
 
 // The model presented here is largely based on John McCarthy's
@@ -34,7 +34,7 @@ procedure halt( msg : string );
 // Specifically, we're translating this page:
 //
 //    http://www-formal.stanford.edu/jmc/recursive/node3.html
-
+
 //-- a. symbolic expressions -----------------------------------
 
 // In order to work with several kinds of symbolic expressions,
@@ -65,7 +65,7 @@ type
     data : integer;
   end;
 {$ENDIF}
-
+
 { }{$IFDEF IMPSHELL}
 { }function ShowExpr( expr : TExpr ) : string; forward;
 { }{$ENDIF}
@@ -76,7 +76,7 @@ function Sx( kind : TKind; data : integer ) : TExpr;
     result.kind := kind;
     result.data := data;
   end; { Sx }
-
+
 // - atoms - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Any s-expression where kind<>kCEL is an atom.
 const atomic = [kSYM..kMF4] - [kCEL];
@@ -106,7 +106,7 @@ function Err( s : string ) : TExpr;
   begin
     result := Sx(kERR, Key(s))
   end;
-
+
 // - cells - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // An S-expression where kind=kCEL is a cell. Cells are simply
 // pairs of s-expressions. For historical reasons, these are
@@ -120,7 +120,7 @@ type
 // 'cells' is the the global table of cells.
 type TCellTbl = specialize arrays.GArray<TCell>;
 var cells : TCellTbl;
-
+
 //-- b. meta-functions ---------------------------------------
 
 // McCarthy used the m-expression syntax as a meta-language to
@@ -135,7 +135,7 @@ type
   TMetaFun2 = function (a,b : TExpr) : TExpr;
   TMetaFun3 = function (a,b,c : TExpr) : TExpr;
   TMetaFun4 = function (a,b,c,d : TExpr) : TExpr;
-
+
 // An s-expression of kind=kMFx is therefore not an M-expression
 // but a symbol that represents a particular pascal function of
 // one of these types.
@@ -166,7 +166,7 @@ const
 var
   metas     : TMetaTbl;
   metacount : byte = 0;
-
+
 // Meta adds a function record to the 'metas' table and constructs
 // a unique symbol for it.
 function NextMeta( a : TArity; p : pointer ) : TExpr;
@@ -188,7 +188,7 @@ function NextMeta( a : TArity; p : pointer ) : TExpr;
       inc(metacount);
     end
   end;
-
+
 function Meta( f : TMetaFun0 ) : TExpr; overload;
   begin result := NextMeta(0, f) end;
 
@@ -205,7 +205,7 @@ function Meta( f : TMetaFun4 ) : TExpr; overload;
   begin result := NextMeta(4, f) end;
 
 // We will populate this table in section e2.
-
+
 // - debugger - - - - - - - - - - - - - - - - - - - - - - - - -
 
 function trace(step:string; e : TExpr) : boolean;
@@ -219,7 +219,7 @@ function trace(step:string; e : TExpr) : boolean;
     result := true;
   end;
 
-
+
 //-- c. elementary meta-expressions ----------------------------
 
 // These are the elementary expressions from the 1960 LISP paper.
@@ -250,7 +250,7 @@ function mCAR( x : TExpr ) : TExpr;
     if mATOM(x) then result := Sx(kErr, Key('!CAR[atom]'))
     else result := cells[x.data].car
   end; { mCAR }
-
+
 // 4. cdr[x] = atom[x] ? undefined | x1 where x = (x0, x1)
 function mCDR( x : TExpr ) : TExpr;
   begin
@@ -266,7 +266,7 @@ function mCONS( x, y : TExpr ) : TExpr;
     cell.cdr := y;
     result := Sx( kCEL, cells.Append( cell ));
   end; { mCons }
-
+
 // - predicates - - - - - - - - - - - - - - - - - - - - - - - - -
 
 // McCarthy's first two elementary expressions translated to the
@@ -292,7 +292,7 @@ procedure CreateBooleans;
     sNULL := Sx(kNUL, Key('()'));
     sTRUE := Sx(kSYM, Key('T'));
   end;
-
+
 // To translate:
 
 // EnBool encodes a pascal boolean as an s-expression:
@@ -306,7 +306,7 @@ function ExBool( x : TExpr ) : boolean;
   begin
     result := x.kind <> kNUL
   end;
-
+
 // We can now define new versions of mATOM and mEQ as TExpr->TExpr.
 // Following lisp tradiion, the P suffix is used both as an
 // abbreviation for the word 'predicate' and for its resemblence
@@ -321,7 +321,7 @@ function mEQP( x, y : TExpr ) : TExpr;
   begin
     result := EnBool( mEQ( x, y ))
   end;
-
+
 //-- d. recursive meta-functions -------------------------------
 
 // 1. ff[x] -> first atomic symbol in f, ignoring parentheses.
@@ -352,7 +352,7 @@ function mEQUAL( x, y : TExpr ) : TExpr;
            and mEQ(MCAR(x), mCAR(y))
            and mEQ(mCDR(x), mCDR(y)) ) )
   end;
-
+
 // 4. null?(x) -> T if x = NIL else F
 function mNULL( x : TExpr ) : boolean;
   begin
@@ -364,7 +364,7 @@ function mNULLP( x : TExpr ) : TExpr;
   begin
     result := mEQP(x, sNULL)
   end;
-
+
 // - abbreviations - - - - - - - - - - - - - - - - - - - - - - -
 
 // caar[x] -> car[car[x]]
@@ -395,7 +395,7 @@ function mCADDAR( x : TExpr ) : TExpr;
   begin
     result := mCAR(mCDR(mCDR(mCAR(x))))
   end;
-
+
 // caddr[x] -> car[cdr[cdr[x]]]
 function mCADDR( x : TExpr ) : TExpr;
   begin
@@ -411,7 +411,7 @@ function mCADDDDR( x : TExpr ) : TExpr;
   begin
     result := mCAR(mCDR(mCDR(mCDR(mCDR(x)))))
   end;
-
+
 // - list builder - - - - - - - - - - - - - - - - - - - - - - - -
 
 // The function L will build lists as s-sexpressions. This
@@ -439,7 +439,7 @@ function L( a : TExpr ) : TExpr;
 // (list a (b c)) -> (a (b c))
 function L( a, b : TExpr ) : TExpr; inline;
  begin result := mCONS(a, L(b)) end;
-
+
 // The rest of these just follow the same pattern:
 
 function L( a, b, c : TExpr ) : TExpr; inline;
@@ -465,7 +465,7 @@ function L( a, b, c, d, e, f, g, h, i : TExpr ) : TExpr; inline;
 
 function L( a, b, c, d, e, f, g, h, i, j : TExpr ) : TExpr; inline;
   begin result := mCONS(a, L(b, c, d, e, f, g, h, i, j)) end;
-
+
 // - list enumerator - - - - - - - - - - - - - - - - - - - - - -
 
 // "for x in exprs.." syntax for TExpr values.
@@ -491,7 +491,7 @@ constructor TExprEnumerator.Create(const x:TExpr);
       end
     else raise Exception.Create('not a list')
   end;
-
+
 function TExprEnumerator.GetCurrent : TExpr;
   begin
     result := mCAR(self.cell)
@@ -512,7 +512,7 @@ operator Enumerator(const x: TExpr): TExprEnumerator;
   begin
     result := TExprEnumerator.Create(x)
   end;
-
+
 // - functions - - - - - - - - - - - - - - - - - - - - - - - - -
 
 // append[x;y] -> append y to x
@@ -541,7 +541,7 @@ function mZIP( x, y : TExpr ) : TExpr;
     else result := mCONS(L(mCAR(x), mCAR(y)),
                          mZIP(mCDR(x), mCDR(y)))
   end;
-
+
 // assoc[s;a] look up symbol s in alist a where a = ((k0,v0) (k1,v1) ...)
 function mASSOC( s, a : TExpr ) : TExpr;
   begin
@@ -562,7 +562,7 @@ function mSUBLIS( x, y : TExpr ) : TExpr;
     if mATOM(x) then result := SUB2(x, y)
     else result := mCONS(mSUBLIS(x, mCAR(y)), mSUBLIS(x, mCDR(y)))
   end;
-
+
 //-- e. functions as s-expressions -----------------------------
 
 // In this section, McCarthy provides the rules for rewriting
@@ -597,7 +597,7 @@ function q(x:TExpr) : TExpr;
   begin
     result := L(sQUOTE, x)
   end; { q }
-
+
 // Once again, we'll create a procedure to initialize these
 // for us and invoke the procedure at startup.
 procedure CreateSpecials;
@@ -609,7 +609,7 @@ procedure CreateSpecials;
     sENV    := Sym('env');
     sDEF    := Sym('def');
   end;
-
+
 // e2. "Variables and function names that were represented by strings of
 // lower-case letters are translated to the corresponding strings of the
 // corresponding uppercase letters. Thus car* is CAR and subst* is SUBST."
@@ -642,7 +642,7 @@ var
   sAtomP, sEqP, sCar, sCdr, sCons, sSubst, sEqualP, sNullP,
   sCaar, sCadr, sCadar, sCaddr, sAppend, sAmongP, sZip,
   sAssoc, sSublis,
-
+
   // and now the ones we'll define later ...
   sApply, sEval, sAppq,
   sList, sMapList, sSearch, sFilter, sReduce,
@@ -651,7 +651,7 @@ var
   sArray, sLen, sPush, sPop,
   sSym2Chars, sChars2Sym
   : TExpr;
-
+
 {$ENDIF}
 { }{$IFDEF IMPSHELL}
   // ... for which we also have to provide forward declarations,
@@ -684,7 +684,7 @@ var
   function mSYM2CHARS ( x : TExpr ) : TExpr; forward;
   function mCHARS2SYM ( chars : TExpr ) : TExpr; forward;
 { }{$ENDIF}
-
+
 // We will also need a routine to bind names to their values at runtime,
 // but we'll postpone defining it until after we've defined mEVAL.
 // Also, we will want to experiment with various representations for
@@ -699,7 +699,7 @@ function Define(iden:string; value:TExpr) : TExpr;
   begin
     result := bindFn(Sym(iden), value)
   end;
-
+
 // It would be nice if we could also pass in the function pointer
 // above, but that would require duplicating the type-system
 // shenannigans we already went through when we defined Meta().
@@ -734,6 +734,7 @@ procedure CreateBuiltins;
     sSearch := Define('search', Meta(@mSEARCH));
     sFilter := Define('filter', Meta(@mFILTER));
     sReduce := Define('reduce', Meta(@mREDUCE));
+
     sAdd := Define('+', Meta(@mADD));
     sSub := Define('-', Meta(@mSUB));
     sMul := Define('*', Meta(@mMUL));
@@ -752,14 +753,14 @@ procedure CreateBuiltins;
     sChars2Sym := Define('chars->sym', Meta(@mCHARS2SYM));
   end;
 
-
+
 // This next part is here both to provide some docs and to
 // suppress the 'variable assigned but never used' notes...
 procedure Doc(sym : TExpr; s : string );
   begin
     //  TODO! AddHelp(...)
   end;
-
+
 procedure DescribeBuiltins;
   begin
     Doc(sAtomP , '(sym -> bool) is symbol an atom?');
@@ -787,6 +788,7 @@ procedure DescribeBuiltins;
     Doc(sSearch, 'TODO');
     Doc(sFilter, 'TODO');
     Doc(sReduce, 'TODO');
+
     Doc(sAdd, 'x y -> x + y');
     Doc(sSub, 'x y -> x - y');
     Doc(sMul, 'x y -> x * y');
@@ -808,7 +810,7 @@ procedure DescribeBuiltins;
 // That's it for rule 2 for meta->symbolic translation.
 // The others won't require nearly as much work.
 
-
+
 // 3. A form  f[e1; ...; en*] is translated to  (f*, e1* ... en*).
 // Thus cons [car [x]; cdr [x]]* is (CONS (CAR X) (CDR X)).
 //
@@ -832,7 +834,7 @@ procedure DescribeBuiltins;
 // forward ref because they can call each other recursively.
 { }function VL(vars : array of variant) : TExpr; forward;
 { }{$ENDIF}
-
+
 function Vx(v : variant) : TExpr; overload;
   begin
     case VarType(v) and VarTypeMask of
@@ -866,7 +868,7 @@ function Vx(v : variant) : TExpr; overload;
            +'">'));
     end
   end;
-
+
 function VL(vars : array of variant) : TExpr;
   var i: integer;
   begin
@@ -880,7 +882,7 @@ function VL(vars : array of variant) : TExpr;
 // e6. Label
 //
 // See note above (in e1. Quote).
-
+
 //-- f. universal evaluator ------------------------------------
 
 function mAPPQ( m : TExpr ) : TExpr;
@@ -893,7 +895,7 @@ function mAPPLY( f, args, env : TExpr ) : TExpr;
   begin
     result := mEVAL(mCONS(f, mAPPQ(args)), env)
   end;
-
+
 function mEVAL( e, a : TExpr ) : TExpr;
 
   function mEVCON( c, a : TExpr ) : TExpr;
@@ -908,7 +910,7 @@ function mEVAL( e, a : TExpr ) : TExpr;
       if mNULL(m) then result := sNULL
       else result := mCONS(mEVAL(mCAR(m), a), mEVLIS(mCDR(m), a))
     end; { mEVLIS }
-
+
   var
     h{head}, r{result}, x : TExpr;
   begin { mEVAL }
@@ -938,6 +940,7 @@ function mEVAL( e, a : TExpr ) : TExpr;
         { eval[(CONS X Y), a] -> cons[eval[X, a], eval[Y, a]] }
         else if mEQ(h, sCONS) then r := mCONS(mEVAL(mCADR(e), a),
                                               mEVAL(mCADDR(e), a))
+
         { eval[h|t, a] -> eval[cons[eval[h,a], evlis[t, a]], a] }
         else begin
           x := mASSOC(h, a);
@@ -969,7 +972,7 @@ function mEVAL( e, a : TExpr ) : TExpr;
                               mEVLIS(mCDR(e), a)), a));
     result := r
   end; { mEVAL }
-
+
 {$IFDEF IMPSHELL}
 var mENV : TExpr; // initial environment
 {$ENDIF}
@@ -983,7 +986,7 @@ function mLIST ( x : TExpr ) : TExpr;
   begin
     result := sNULL
   end;
-
+
 //-- g. higher order functions ---------------------------------
 
 function mMAPLIST( f, x : TExpr ) : TExpr;
@@ -1005,7 +1008,7 @@ function mREDUCE( f, x, y : TExpr ) : TExpr;
   begin
     result := sNULL
   end;
-
+
 //-- arithmetic  -----------------------------------------------
 
 function ints( x, y : TExpr; out errx : TExpr) : boolean;
@@ -1018,7 +1021,7 @@ function Nx( n : integer ) : TExpr;
   begin
     result := Sx(kINT, n)
   end;
-
+
 function mADD( x, y : TExpr ) : TExpr;
   begin
     if ints(x,y,result) then result := Nx(x.data + y.data)
@@ -1048,7 +1051,7 @@ function mPOW( x, y : TExpr ) : TExpr;
   begin
     if ints(x,y,result) then result := Nx(x.data ** y.data)
   end;
-
+
 // - functions - - - - - - - - - - - - - - - - - - - - - - - - -
 type
   TBind = record // name bindings.
@@ -1071,7 +1074,7 @@ type
 var
   debugging : boolean = true;
   ShowFormat : TFormat = fmtLisp;
-
+
 function k2s( kind :  TKind ) : string;
   begin
     case kind of
@@ -1091,7 +1094,7 @@ procedure debug( msg : string ); inline;
   begin
     if debugging then writeln( msg )
   end;
-
+
 //== read part =================================================
 {$IFDEF IMPSHELL}
 type
@@ -1118,7 +1121,7 @@ type
     function NextExpr( out value : TExpr ): TExpr;
   end;
 {$ENDIF}
-
+
 constructor TImplishReader.Create( gen : TStrGen );
   begin
     ch :=  #0; nest := ''; getLine := gen; atEOF := false;
@@ -1134,7 +1137,7 @@ function TImplishReader.Depth : cardinal;
   begin
     result := Length(nest);
   end; { TImplishReader.Depth }
-
+
   var ps : string; // TODO: clean this prompt mess up!!
 function prompt( out line : string ) : boolean;
   begin
@@ -1155,7 +1158,7 @@ function prompt( out line : string ) : boolean;
 	end
     {$ENDIF}
   end;
-
+
 type EndOfFile = class (Exception) end;
 function TImplishReader.NextChar( var _ch : char ) : char;
   begin
@@ -1183,7 +1186,7 @@ function TImplishReader.NextChar( var _ch : char ) : char;
     //       ', column ' + n2s( lx ) + ' : ' +  result + ']' );
     _ch := result;
   end; { TImplishReader.NextChar }
-
+
 // this recognizes decimal integers.
 function TImplishReader.IsNum( s : string; out num : integer ) : boolean;
   var i : cardinal = 1; negate : boolean = false;
@@ -1216,7 +1219,7 @@ function PopChar( var s : string ) : char;
     SetLength( s, last - 1 );
     result := ch;
   end; { PopChar }
-
+
 function TImplishReader.ReadString : TExpr;
   var s : string = '';
   begin
@@ -1240,7 +1243,7 @@ procedure TImplishReader.HandleDirective;
     while ch <> ascii.LF do s += NextChar(ch);
     if AnsiStartsStr('fmt:struct', s) then showFormat := fmtStruct;
   end; { TImplishReader.HandleDirective }
-
+
 procedure TImplishReader.SkipCommentsAndWhitespace;
   begin
     //writeln('1: ord(ch):', ord(ch), '... atEOF: ', atEOF);
@@ -1254,7 +1257,7 @@ procedure TImplishReader.SkipCommentsAndWhitespace;
 	  end;
     end
   end; { TImplishReader.SkipCommentsAndWhitespace }
-
+
 function TImplishReader.ReadListEnd : TExpr;
   var expect : char;
   begin
@@ -1272,7 +1275,7 @@ function TImplishReader.ReadListEnd : TExpr;
     end;
     NextChar(ch);
   end; { TImplishReader.ReadListEnd }
-
+
 function TImplishReader.NextExpr( out value : TExpr ): TExpr;
 
   function ReadList( out res : TExpr; AtHead : boolean) : TExpr;
@@ -1298,8 +1301,8 @@ function TImplishReader.NextExpr( out value : TExpr ): TExpr;
       if NextExpr(result).kind <> kERR
       then result := q(result)
     end; { ReadQuote }
-
-  begin
+
+  begin {TImplishReader.NextExpr}
     try
       //if atEOF then raise EndOfFile.Create('');
       //writeln('skipping comments...');
@@ -1319,7 +1322,7 @@ function TImplishReader.NextExpr( out value : TExpr ): TExpr;
     end;
     value := result;
   end; { TImplishReader.NextExpr }
-
+
 //== eval part =================================================
 // The evaluator applies functions that are in the car of a cell
 // to that same cell's cdr.
@@ -1341,7 +1344,7 @@ function Eval( itm : TExpr ) : TExpr;
   begin
     result := mEVAL(itm, mENV)
   end;
-
+
 //== print part ================================================
 
 function DumpCell( ref : TExpr ): string;
@@ -1354,7 +1357,7 @@ function DumpCell( ref : TExpr ): string;
       k2s(cell.cdr.kind) + ':' + n2s(cell.cdr.data) + '):' +
       n2s(ref.data);
   end; { DumpCell }
-
+
 function ShowExpr( expr : TExpr ) : string;
 
   function ShowList( ref : TExpr; AtHead : boolean) : string;
@@ -1372,8 +1375,8 @@ function ShowExpr( expr : TExpr ) : string;
         else   AppendStr( result, ' . ' + ShowExpr( cell.cdr ) + ')');
       end;
     end; { ShowList }
-
-  begin
+
+  begin {ShowExpr}
     case expr.kind of
       KNUL,
       kERR,
@@ -1408,11 +1411,11 @@ procedure Shell;
     until val.kind in [kERR, kEOF];
     reader.Free;
   end;
-
+
 {-- support routines for parser stuff --}
 
 type TExprStack = specialize GStack<TExpr>;
-
+
 function ReadFile( path : string ) : TExpr;
   var
     f  : text;
@@ -1449,7 +1452,7 @@ function ReadFile( path : string ) : TExpr;
     CloseFile(f);
     // debug('ReadFile result:' + ShowExpr(result));
   end; { ReadFile }
-
+
 function mREADFILE  ( path : TExpr ) : TExpr;
   begin
     if path.kind in [kSYM, kSTR]
@@ -1462,7 +1465,7 @@ function mWRITEFILE ( path, data : TExpr ) : TExpr;
   begin
     result := sNULL
   end; { mWRITEFILE }
-
+
 function mBINREAD   ( path : TExpr ) : TExpr;
   begin
     result := sNULL
@@ -1472,7 +1475,7 @@ function mBINWRITE  ( path, data : TExpr ) : TExpr;
   begin
     result := sNULL
   end; { mBINWRITE }
-
+
 function mARRAY ( size : TExpr ) : TExpr;
   begin
     result := sNULL
@@ -1492,7 +1495,7 @@ function mPOP ( a, x : TExpr ) : TExpr;
   begin
     result := sNULL
   end; { mPOP }
-
+
 // ! sym2chars is almost exactly the same as VL()
 // ... worth it to consolidate with a template / generic?
 function mSYM2CHARS ( x : TExpr ) : TExpr;
@@ -1520,7 +1523,7 @@ function mCHARS2SYM ( chars : TExpr ) : TExpr;
     if bad.kind = kNUL then result := Sym(s)
     else result := Err('chars->sym: invalid char:' + ShowExpr(bad))
   end; { mCHARS2SYM }
-
+
 begin
   syms := TSymTbl.Create;
   cells := TCellTbl.Create;
