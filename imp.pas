@@ -1062,12 +1062,6 @@ type
 
 var
   defs : TDefTbl;
-const
-  whitespace  = [#0..' '];
-  stopchars   = whitespace + ['(',')','[',']','{','}', '"', ''''];
-  commentChar = '#';
-  prompt0     = 'imp> ';
-  prompt1     = '...> ';
 
 type
   TFormat = (fmtLisp, fmtStruct);
@@ -1107,6 +1101,7 @@ type
     atEOF : boolean;
     lx, ly : cardinal;
     getLine : TStrGen;
+    whitespace, stopchars : set of char;
     procedure SyntaxError(const err : string);
     function  Depth : cardinal;
     function NextChar(var _ch :  char ) : char;
@@ -1119,12 +1114,20 @@ type
   public
     constructor Create( gen : TStrGen );
     function NextExpr( out value : TExpr ): TExpr;
+  public
+    commentChar : char;
+    prompt0, prompt1 : string;
   end;
 {$ENDIF}
 
 constructor TImplishReader.Create( gen : TStrGen );
   begin
     ch :=  #0; nest := ''; getLine := gen; atEOF := false;
+    whitespace  := [#0..' '];
+    stopchars   := whitespace + ['(',')','[',']','{','}', '"', ''''];
+    commentChar := '#';
+    prompt0     := 'imp> ';
+    prompt1     := '...> ';
   end; { TImplishReader.Create }
 
 procedure TImplishReader.SyntaxError( const err: string );
@@ -1435,6 +1438,7 @@ function ReadFile( path : string ) : TExpr;
   begin
     Assign(f, path); Reset(f);
     r := TImplishReader.Create( @NextLine );
+    r.commentChar := ';'; //  TODO: this is a kludge. fix it!
     xs := TExprStack.Create(1024);
     while not (r.NextExpr( x ).kind in [kERR, kEOF]) do begin
       // debug('expr from file: ' + ShowExpr(x));
