@@ -1101,7 +1101,7 @@ type
   TStrGen = function(out s : string) : boolean is nested;
   TImplishReader = class
   private
-    ch	 : char;
+    ch   : char;
     line : string;
     nest : string;
     atEOF : boolean;
@@ -1148,14 +1148,14 @@ function prompt( out line : string ) : boolean;
     {$ELSE}
       if lined.prompt(ps, line) then begin
     {$ENDIF}
-	writeln;
-	line := line + ascii.LF; { so we can do proper lookahead. }
+        writeln;
+        line := line + ascii.LF; { so we can do proper lookahead. }
       end
     {$IFNDEF NOPROMPT}else
         begin
-	  result := false;
-	  system.halt;
-	end
+          result := false;
+          system.halt;
+        end
     {$ENDIF}
   end;
 
@@ -1174,10 +1174,10 @@ function TImplishReader.NextChar( var _ch : char ) : char;
         else ps := prompt0;
       {$ENDIF}
       if self.getLine(self.line) then
-	begin
-	  lx := 0; inc(ly);
-	  AppendStr(self.line, ascii.lf);
-	end
+        begin
+          lx := 0; inc(ly);
+          AppendStr(self.line, ascii.lf);
+        end
       else self.atEOF := true
     end;
     inc( lx );
@@ -1250,11 +1250,11 @@ procedure TImplishReader.SkipCommentsAndWhitespace;
     while (ch in whitespace) and not atEOF do begin
       if NextChar(ch) = commentChar then
         if NextChar(ch) = '%' then HandleDirective
-	else while (ch <> ascii.LF) and not atEOF do
+        else while (ch <> ascii.LF) and not atEOF do
           begin
-	    //writeln('2: ord(ch):', ord(ch), '... atEOF?', atEOF);
-	    NextChar(ch);
-	  end;
+            //writeln('2: ord(ch):', ord(ch), '... atEOF?', atEOF);
+            NextChar(ch);
+          end;
     end
   end; { TImplishReader.SkipCommentsAndWhitespace }
 
@@ -1271,7 +1271,7 @@ function TImplishReader.ReadListEnd : TExpr;
       end;
       if ch = expect then result := sNULL
       else result := Err('List end mismatch. Expected: '
-			 + expect + ', got: ' + ch);
+                         + expect + ', got: ' + ch);
     end;
     NextChar(ch);
   end; { TImplishReader.ReadListEnd }
@@ -1309,16 +1309,16 @@ function TImplishReader.NextExpr( out value : TExpr ): TExpr;
       SkipCommentsAndWhitespace;
       //writeln('reading. ch=', ch);
       case ch of
-	'(','[','{' : ReadList(result, true);
-	')',']','}' : result := ReadListEnd;
-	'"'	    : result := ReadString;
-	''''	    : result := ReadQuote;
-	else result := ReadAtom;
+        '(','[','{' : ReadList(result, true);
+        ')',']','}' : result := ReadListEnd;
+        '"'         : result := ReadString;
+        ''''        : result := ReadQuote;
+        else result := ReadAtom;
       end
     except
       on EndOfFile do
-	if depth > 0 then result := Err('unexpected end of file!')
-	else result := Sx(kEOF, 0)
+        if depth > 0 then result := Err('unexpected end of file!')
+        else result := Sx(kEOF, 0)
     end;
     value := result;
   end; { TImplishReader.NextExpr }
@@ -1426,9 +1426,9 @@ function ReadFile( path : string ) : TExpr;
     begin
       if Eof(f) then result := false
       else begin
-	result := true;
-	ReadLn(f, line);
-	// write('nextline: "', line);
+        result := true;
+        ReadLn(f, line);
+        // write('nextline: "', line);
       end;
       // if not result then raise Exception.Create('for stack trace');
     end;
@@ -1444,7 +1444,7 @@ function ReadFile( path : string ) : TExpr;
     else begin
       result := sNULL;
       while xs.count > 0 do begin
-	result := mCONS( xs.pop, result );
+        result := mCONS( xs.pop, result );
       end;
     end;
     xs.Free;
@@ -1458,7 +1458,7 @@ function mREADFILE  ( path : TExpr ) : TExpr;
     if path.kind in [kSYM, kSTR]
       then result := ReadFile(syms[path.data])
       else result := Err('READFILE: expected filename, got: '
-			 + ShowExpr(path))
+                         + ShowExpr(path))
   end; { mREADFILE }
 
 function mWRITEFILE ( path, data : TExpr ) : TExpr;
@@ -1505,11 +1505,11 @@ function mSYM2CHARS ( x : TExpr ) : TExpr;
     else if x.kind in [kSTR, kSYM] then
       begin
         result := sNULL; s := syms[x.data];
-	for i := length(s) downto 1 do
-	  result := mCONS(Sym(s[i]), result)
+        for i := length(s) downto 1 do
+          result := mCONS(Sym(s[i]), result)
       end
     else result := Err('sym->chars: expected symbol, got ' +
-		       k2s(x.kind))
+                       k2s(x.kind))
   end; { mSYM2CHARS }
 
 function mCHARS2SYM ( chars : TExpr ) : TExpr;
