@@ -47,20 +47,32 @@ type
 //
 type
   TVorunati<I,O> = class (TInterfacedObject, IVorTask, ITake<I>, IGive<O>)
-  private
-    _state : vor;
-  public
-    constructor Create;
-    function GetState : vor; virtual;
-    function Poll(out oval : O ) : boolean; virtual;
-    procedure Send( ival : I ); virtual;
-    procedure Step; virtual;
-    procedure Run; virtual; // default version steps while state = vo.
-  end;
+    private
+      _state : vor;
+    public
+      constructor Create;
+      function GetState : vor; virtual;
+      function Poll(out oval : O ) : boolean; virtual;
+      procedure Send( ival : I ); virtual;
+      procedure Step; virtual;
+      procedure Run; virtual; // default version steps while state = vo.
+    end;
+  
+  
+// TVorStep is a way to lift/wrap simple functions into the vorunati system.
+type
+  TVorStep = function : vor of object;
+  TVorTask = class (TVorunati<void, void>)
+    private
+      _step : TVorStep;
+    public
+      constructor Create( stepper : TVorStep );
+      procedure Step; override;
+    end;
+  
 
 {$IFDEF FUTURE}/////////////////////////////////////////////////
 type
-
   // act a queue for values of type A
   TFIFOVor<A> = class (TVorunati<A,A>)
     constructor Create(src : IGive<A>; snk : ITake<A>);
@@ -139,7 +151,16 @@ procedure TVorunati<I,O>.Run;
   begin
     while _state = vo do Step
   end;
-   
+
+constructor TVorTask.Create( stepper : TVorStep );
+  begin
+    _step := stepper
+  end;
+  
+procedure TVorTask.Step;
+  begin
+    _state := _step
+  end;
   
 initialization
 end.
