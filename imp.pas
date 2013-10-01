@@ -1146,7 +1146,7 @@ function prompt( out line : string ) : boolean;
   begin
     result := true;
     {$IFDEF NOPROMPT}
-    if eof then result := false;
+    if eof then result := false
     else begin readln(line);
     {$ELSE}
       if lined.prompt(ps, line) then begin
