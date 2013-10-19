@@ -2,7 +2,7 @@
 from __future__ import print_function
 import re
 
-rxDefn  = re.compile(r"^(procedure|function)")
+rxDefn  = re.compile(r"^(procedure|function|operator)")
 rxNewBlock = re.compile(r"{\$IFDEF IMPSHELL}")
 rxEndBlock = re.compile(r"{\$ENDIF}")
 
