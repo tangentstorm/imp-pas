@@ -23,9 +23,6 @@ raw: imp.pas
 run-tests.pas:
 	ln -F -s $(XPL)/../test/run-tests.pas
 
-$(GEN)/imp.def: imp.pas
-	python tools/impdefs.py  > $(GEN)/imp.def
-
 unit: $(GEN)/imp.def imp run-tests.pas
 	@cd test; python ../$(XPL)/../test/gen-tests.py ../$(GEN)
 	$(FPC) -Mobjfpc -vn run-tests.pas -Fu./test -oimptest

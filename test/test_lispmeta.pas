@@ -1,5 +1,5 @@
 {$i test_lispmeta.def }
-implementation uses imp;
+implementation uses uimp;
 
 procedure cx( a : string; b : TExpr );
   begin
@@ -19,52 +19,52 @@ procedure test_vxvl;
   begin
     cx('(1 2)', VL([1,2]));
     cx('(a b c 1 2 3)', VL(['a','b','c',1,2,3]));
-    cx('(x y)', mCONS(x, mCONS( y, sNULL )));
+    cx('(x y)', ml.mCONS(x, ml.mCONS( y, sNULL )));
     cx('(cons a b)', L(sCons, a, b));
   end;
 
 procedure test_atomP;
   begin
-    cx('T', mATOMP(Vx(1)));
-    cx('T', mATOMP(sNULL));
-    cx('T', mATOMP(x));
-    cx('()', mATOMP(VL([1])));
-    cx('()', mATOMP(L(x,y)));
+    cx('T', ml.mATOMP(Vx(1)));
+    cx('T', ml.mATOMP(sNULL));
+    cx('T', ml.mATOMP(x));
+    cx('()', ml.mATOMP(VL([1])));
+    cx('()', ml.mATOMP(L(x,y)));
   end;
 
 procedure test_eqP;
   begin
-    cx('T', mEQP(x, x));
-    cx('()', mEQP(x, y));
-    cx('()', mEQP(x, sNULL));
+    cx('T', ml.mEQP(x, x));
+    cx('()', ml.mEQP(x, y));
+    cx('()', ml.mEQP(x, sNULL));
   end;
 
 procedure test_car;
   begin
-    cx('a', mCAR(L(a,b)));
-    cx('x', mCAR(L(x)));
+    cx('a', ml.mCAR(L(a,b)));
+    cx('x', ml.mCAR(L(x)));
   end;
 
 procedure test_cdr;
   begin
-    cx('(b)', mCDR(L(a,b)));
-    cx('()', mCDR(L(x)));
+    cx('(b)', ml.mCDR(L(a,b)));
+    cx('()', ml.mCDR(L(x)));
   end;
 
 procedure test_cons;
   begin
-    cx('(x)', mCONS(x, sNULL));
-    cx('(y x)', mCONS(y, L(x)));
+    cx('(x)', ml.mCONS(x, sNULL));
+    cx('(y x)', ml.mCONS(y, L(x)));
   end;
 
 procedure test_mAPPQ;
   begin
-    cx('((quote a) (quote b))', mAPPQ(L(a,b)));
+    cx('((quote a) (quote b))', ml.mAPPQ(L(a,b)));
   end;
 
 procedure test_append;
   begin
-    cx('(a b x y)', mAPPEND(L(a,b), L(x,y)))
+    cx('(a b x y)', ml.mAPPEND(L(a,b), L(x,y)))
   end;
 
 procedure test_env;
@@ -75,7 +75,7 @@ procedure test_env;
 // check eval
 procedure cev(s : string; x:TExpr);
   begin
-    cx(s, mEVAL(x, mAPPEND(env, mENV)))
+    cx(s, ml.mEVAL(x, ml.mAPPEND(env, mENV)))
   end;
 
 procedure test_eval_atom;
@@ -92,8 +92,8 @@ procedure test_eval_quote;
 
 procedure test_apply;
   begin
-    cx('(a . b)', mAPPLY(sCons, L(a, b), mENV));
-    cx('(a b)', mAPPLY(sCons, L(a, L(b)), mENV));
+    cx('(a . b)', ml.mAPPLY(sCons, L(a, b), mENV));
+    cx('(a b)', ml.mAPPLY(sCons, L(a, L(b)), mENV));
   end;
 
 procedure test_arithmetic;
