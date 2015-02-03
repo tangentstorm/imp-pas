@@ -53,19 +53,19 @@ type
     data : integer;
    end;
 
-function ShowExpr( expr : TExpr ) : string;
+function ShowExpr( expr : TExpr ) : TStr;
 
 // Sx() provides a universal constructor for s-expressions.
 function Sx( kind : TKind; data : integer ) : TExpr;
 
 // Key() converts a string to an integer, representing its
 // position in the lookup table.
-function Key( s :  string ) : cardinal;
+function Key( s :  TStr ) : cardinal;
 
 // To expose a symbolic name to the interpreter, we can create
 // symbols with Sx(kSYM, Key('name')), but it would be nicer if
 // we could simplify it to Sym('name'). So:
-function Sym( s : string ) : TExpr;
+function Sym( s : TStr ) : TExpr;
 
 
 // - atoms - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -75,7 +75,7 @@ const atomic = [kSYM..kMF4] - [kCEL];
 // We can represent Symbols, NULL, Errors, and String atoms
 // as strings in pascal, and store values for all of them in
 // the same lookup table:
-type TSymTbl = specialize arrays.GEqArray<string>;
+type TSymTbl = specialize arrays.GEqArray<TStr>;
 var syms : TSymTbl;
 
 
@@ -365,8 +365,8 @@ var bindFn : TMetaFun2; // (identifier, value)->identifier
 
 // Now we can define a function to create a symbol from a pascal
 // string and bind it to a value.
-function Define(iden : string; value:TExpr) : TExpr;
-procedure Doc(sym : TExpr; s : string );
+function Define(iden : TStr; value:TExpr) : TExpr;
+procedure Doc(sym : TExpr; s : TStr );
 
 
 // 3. A form  f[e1; ...; en*] is translated to  (f*, e1* ... en*).
@@ -401,20 +401,20 @@ function Nx( n : integer ) : TExpr;
 //== reader ====================================================
 
 type
-  TStrGen = function(out s : string) : boolean is nested;
+  TStrGen = function(out s : TStr) : boolean is nested;
   TImplishReader = class
   private
     ch   : char;
-    line : string;
-    nest : string;
+    line : TStr;
+    nest : TStr;
     atEOF : boolean;
     lx, ly : cardinal;
     getLine : TStrGen;
-    whitespace, stopchars : set of char;
-    procedure SyntaxError(const err : string);
+    whitespace, stopchars : set of ansichar;
+    procedure SyntaxError(const err : TStr);
     function  Depth : cardinal;
     function NextChar(var _ch :  char ) : char;
-    function IsNum( s : string; out num : integer ) : boolean;
+    function IsNum( s : TStr; out num : integer ) : boolean;
     function ReadAtom : TExpr;
     function ReadString : TExpr;
     procedure HandleDirective;
@@ -425,7 +425,7 @@ type
     function NextExpr( out value : TExpr ): TExpr;
   public
     commentChar : char;
-    prompt0, prompt1 : string;
+    prompt0, prompt1 : TStr;
   end;
 
 var mENV : TExpr; // initial environment
@@ -434,7 +434,7 @@ procedure Print( expr : TExpr );
 procedure Shell;
 
 type TExprStack = specialize GStack<TExpr>;
-function ReadFile( path : string ) : TExpr;
+function ReadFile( path : TStr ) : TExpr;
 
 
 implementation
@@ -445,17 +445,17 @@ function Sx( kind : TKind; data : integer ) : TExpr;
     result.data := data;
   end;
 
-function Key( s :  string ) : cardinal;
+function Key( s :  TStr ) : cardinal;
   begin
     if not syms.Find( s, result ) then result := syms.Append( s );
   end;
 
-function Sym( s : string ) : TExpr;
+function Sym( s : TStr ) : TExpr;
   begin
     result := Sx(kSYM, Key(s))
   end;
 
-function Err( s : string ) : TExpr;
+function Err( s : TStr ) : TExpr;
   begin
     result := Sx(kERR, Key(s))
   end;
@@ -497,7 +497,7 @@ function Meta( f : TMetaFun3 ) : TExpr; overload;
 
 function Meta( f : TMetaFun4 ) : TExpr; overload;
   begin result := NextMeta(4, f) end;
-  
+
 function Meta( f : TMetaFun5 ) : TExpr; overload;
   begin result := NextMeta(5, f) end;
 
@@ -505,8 +505,8 @@ function Meta( f : TMetaFun5 ) : TExpr; overload;
 
 // - debugger - - - - - - - - - - - - - - - - - - - - - - - - -
 
-function trace(step:string; e : TExpr) : boolean;
-  var cmd: string;
+function trace(step:TStr; e : TExpr) : boolean;
+  var cmd: TStr;
   begin
     writeln( step, ':', ShowExpr(e));
     {$IFDEF NOPROMPT} readln(cmd);
@@ -565,7 +565,7 @@ procedure CreateBooleans;
     sNULL := Sx(kNUL, Key('()'));
     sTRUE := Sx(kSYM, Key('T'));
   end;
-  
+
 function EnBool( b : boolean ) : TExpr;
   begin
     if b then result := sTRUE else result := sNULL
@@ -839,7 +839,7 @@ procedure CreateSpecials;
 
 // Now we can define a function to create a symbol from a pascal
 // string and bind it to a value.
-function Define(iden:string; value:TExpr) : TExpr;
+function Define(iden:TStr; value:TExpr) : TExpr;
   begin
     result := bindFn(Sym(iden), value)
   end;
@@ -900,7 +900,7 @@ procedure TMetaLang.CreateBuiltins;
 
 // This next part is here both to provide some docs and to
 // suppress the 'variable assigned but never used' notes...
-procedure Doc(sym : TExpr; s : string );
+procedure Doc(sym : TExpr; s : TStr );
   begin
     //  TODO! AddHelp(...)
   end;
@@ -1184,7 +1184,7 @@ var
   debugging : boolean = true;
   ShowFormat : TFormat = fmtLisp;
 
-function k2s( kind :  TKind ) : string;
+function k2s( kind :  TKind ) : TStr;
   begin
     case kind of
       kNUL : result := 'NUL';
@@ -1199,7 +1199,7 @@ function k2s( kind :  TKind ) : string;
     end
   end;
 
-procedure debug( msg : string ); inline;
+procedure debug( msg : TStr ); inline;
   begin
     if debugging then writeln( msg )
   end;
@@ -1216,7 +1216,7 @@ constructor TImplishReader.Create( gen : TStrGen );
     prompt1     := '...> ';
   end; { TImplishReader.Create }
 
-procedure TImplishReader.SyntaxError( const err: string );
+procedure TImplishReader.SyntaxError( const err: TStr );
   begin
     writeln( '=== syntax error at line ', ly, ', column ', lx, ': ===' );
     die( err );
@@ -1227,8 +1227,8 @@ function TImplishReader.Depth : cardinal;
     result := Length(nest);
   end; { TImplishReader.Depth }
 
-  var ps : string; // TODO: clean this prompt mess up!!
-function prompt( out line : string ) : boolean;
+var ps : TStr; // TODO: clean this prompt mess up!!
+function prompt( out line : TStr ) : boolean;
   begin
     result := true;
     {$IFDEF NOPROMPT}
@@ -1265,7 +1265,7 @@ function TImplishReader.NextChar( var _ch : char ) : char;
       if self.getLine(self.line) then
         begin
           lx := 0; inc(ly);
-          AppendStr(self.line, ascii.lf);
+          self.line += ascii.lf;
         end
       else self.atEOF := true
     end;
@@ -1277,7 +1277,7 @@ function TImplishReader.NextChar( var _ch : char ) : char;
   end; { TImplishReader.NextChar }
 
 // this recognizes decimal integers.
-function TImplishReader.IsNum( s : string; out num : integer ) : boolean;
+function TImplishReader.IsNum( s : TStr; out num : integer ) : boolean;
   var i : cardinal = 1; negate : boolean = false;
   begin
     result := true; num := 0;
@@ -1292,7 +1292,7 @@ function TImplishReader.IsNum( s : string; out num : integer ) : boolean;
   end; { TImplishReader.IsNum }
 
 function TImplishReader.ReadAtom : TExpr;
-  var tok : string = ''; i : integer;
+  var tok : TStr = ''; i : integer;
   begin
     repeat tok := tok + ch until NextChar(ch) in stopchars;
     if IsNum( tok, i )
@@ -1300,7 +1300,7 @@ function TImplishReader.ReadAtom : TExpr;
       else result := Sx( kSYM, Key( tok ))
   end; { TImplishReader.ReadAtom }
 
-function PopChar( var s : string ) : char;
+function PopChar( var s : TStr ) : char;
   var last : integer; ch : char;
   begin
     last := Length(s);
@@ -1310,9 +1310,9 @@ function PopChar( var s : string ) : char;
   end; { PopChar }
 
 function TImplishReader.ReadString : TExpr;
-  var s : string = '';
+  var s : TStr = '';
   begin
-    AppendStr(nest, '"');
+    nest += '"';
     while NextChar(ch) <> '"' do
       if ch = '\' then
         case NextChar(ch) of
@@ -1327,10 +1327,10 @@ function TImplishReader.ReadString : TExpr;
   end; { TImplishReader.ReadString }
 
 procedure TImplishReader.HandleDirective;
-  var s : string = '';
+  var s : TStr = '';
   begin
     while ch <> ascii.LF do s += NextChar(ch);
-    if AnsiStartsStr('fmt:struct', s) then showFormat := fmtStruct;
+    if LeftStr(s, 10) = 'fmt:struct' then showFormat := fmtStruct;
   end; { TImplishReader.HandleDirective }
 
 procedure TImplishReader.SkipCommentsAndWhitespace;
@@ -1436,7 +1436,7 @@ function Eval( itm : TExpr ) : TExpr;
 
 //== print part ================================================
 
-function DumpCell( ref : TExpr ): string;
+function DumpCell( ref : TExpr ): TStr;
   var cell : TCell;
   begin
     cell := cells[ ref.data ];
@@ -1447,9 +1447,9 @@ function DumpCell( ref : TExpr ): string;
       n2s(ref.data);
   end; { DumpCell }
 
-function ShowExpr( expr : TExpr ) : string;
+function ShowExpr( expr : TExpr ) : TStr;
 
-  function ShowList( ref : TExpr; AtHead : boolean) : string;
+  function ShowList( ref : TExpr; AtHead : boolean) : TStr;
     var cell : TCell;
     begin
       // debug('ShowList:' + DumpCell(ref));
@@ -1457,11 +1457,11 @@ function ShowExpr( expr : TExpr ) : string;
       cell := cells[ ref.data ];
       result += ShowExpr( cell.car );
       if showFormat = fmtStruct then
-        AppendStr( result, ' . ' + ShowExpr( cell.cdr ) + ')')
+        result += ' . ' + ShowExpr( cell.cdr ) + ')'
       else case cell.cdr.kind of
-        kNUL : AppendStr( result, ')' );
-        kCEL : AppendStr( result, ShowList( cell.cdr, false ));
-        else   AppendStr( result, ' . ' + ShowExpr( cell.cdr ) + ')');
+        kNUL : result += ')';
+        kCEL : result += ShowList( cell.cdr, false );
+        else   result += ' . ' + ShowExpr( cell.cdr ) + ')';
       end;
     end; { ShowList }
 
@@ -1503,13 +1503,13 @@ procedure Shell;
 
 {-- support routines for parser stuff --}
 
-function ReadFile( path : string ) : TExpr;
+function ReadFile( path : TStr ) : TExpr;
   var
     f  : text;
     r  : TImplishReader;
     x  : TExpr;
     xs : TExprStack;
-  function NextLine( out line : string ): boolean;
+  function NextLine( out line : TStr ): boolean;
     begin
       if Eof(f) then result := false
       else begin
@@ -1587,7 +1587,7 @@ function TMetaLang.mPOP ( a, x : TExpr ) : TExpr;
 // ! sym2chars is almost exactly the same as VL()
 // ... worth it to consolidate with a template / generic?
 function TMetaLang.mSYM2CHARS ( x : TExpr ) : TExpr;
-  var i : cardinal; s : string;
+  var i : cardinal; s : TStr;
   begin
     if x.kind = kERR then result := x
     else if x.kind in [kSTR, kSYM] then
@@ -1601,11 +1601,11 @@ function TMetaLang.mSYM2CHARS ( x : TExpr ) : TExpr;
   end; { mSYM2CHARS }
 
 function TMetaLang.mCHARS2SYM ( chars : TExpr ) : TExpr;
-  var s : string; x, bad : TExpr;
+  var s : TStr; x, bad : TExpr;
   begin
     bad := sNULL;
     for x in chars do begin
-      if x.kind = kSYM then AppendStr(s, syms[x.data])
+      if x.kind = kSYM then s += syms[x.data]
       else begin bad := x; break end; // :(
     end;
     if bad.kind = kNUL then result := Sym(s)
